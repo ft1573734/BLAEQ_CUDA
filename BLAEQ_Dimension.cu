@@ -1,5 +1,4 @@
 #include "BLAEQ_Dimension.h"
-#include "BLAEQ_CUDA_Kernels.cu"
 #include "cusparse.h"
 #include "cusparse_v2.h"
 #include <thrust/device_vector.h>
@@ -42,17 +41,21 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 
 }
 
-void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* input_result, cusparseSpVecDescr_t* output_result) {
+void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* result) {
 
+	cusparseSpVecDescr_t* logical_result;
+	cusparseSpVecDescr_t* this_layer;
+	cusparseSpVecDescr_t* next_layer;
 
+	this_layer = Coarsest_Mesh;
 	for (int i = 0; i < L; i++) {
-		_logical_in_range_judgement(min, max, input_result, output_result);
+		_logical_in_range_judgement(min, max, this_layer, logical_result);
 		cusparseSpMatDescr_t* P_matrix = P_Matrices[i];
-		_BLAEQ_SpMSpV(P_matrix, input_result, output_result);
-		output_result = input_result;
+		_BLAEQ_SpMSpV(P_matrix, logical_result, next_layer);
+		this_layer = next_layer;
 		//CUDA_in_range(double q_min, double q_max, double relaxation, double* data, double* indices, double* result_data, double* result_indices, int size)
-
 	}
+	result = this_layer;
 }
 
 
@@ -106,7 +109,8 @@ void BLAEQ_Dimension::_generate_P_matrix(double* M_i_d, int M_i_d_length, double
 	cudaMalloc(&P_cols, P_col_count * sizeof(int));
 
 	int NUM_BLOCKS = (int)ceil(M_i_d_length / NUM_THREADS);
-	CUDA_generate_P_matrix_kernel << <NUM_BLOCKS, NUM_THREADS >> > (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+	//CUDA_generate_P_matrix_kernel <<<NUM_BLOCKS, NUM_THREADS >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+	CUDA_generate_P_matrix(M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols, NUM_BLOCKS, NUM_THREADS);
 
 	cusparseCreateCoo(P_matrix_coo, P_row_count, P_col_count, P_nnz_count, P_rows, P_cols, P_data, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
 
@@ -230,13 +234,18 @@ void BLAEQ_Dimension::_logical_in_range_judgement(double min, double max, cuspar
 	cusparseIndexBase_t* index_base;
 	cudaDataType* data_type;
 
-	cusparseSpVecGet(*input, size, nnz, &index, &data, index_type, index_base, data_type);
+	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+
+
+
 	int* tmp_result_indexes;
 	double* tmp_result_data;
 	cudaMalloc(&tmp_result_indexes, sizeof(int) * *size);
 	cudaMalloc(&tmp_result_data, sizeof(double) * *size);
+	// CUDA_in_range_kernel(double q_min, double q_max, double relaxation, double* data, double* indices, int size, double* result_data, int* result_indices)
 
-	CUDA_in_range_kernel <<<NUM_BLOCKS, NUM_THREADS >>> (min, max, Bandwidths[i] / 2, data, index, *size, tmp_result_data, tmp_result_indexes);
+	//CUDA_in_range_kernel <<<NUM_BLOCKS, NUM_THREADS >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+	CUDA_in_range(min, max, Bandwidths[Dimension] / 2, (double*)data, (int*)index, *size, tmp_result_data, tmp_result_indexes, NUM_BLOCKS, NUM_THREADS);
 
 	int* index_end_ptr = thrust::remove(tmp_result_indexes, tmp_result_indexes + *size, 0);
 	double* data_end_ptr = thrust::remove(tmp_result_data, tmp_result_data + *size, 0.0);
@@ -280,8 +289,8 @@ void BLAEQ_Dimension::_BLAEQ_SpMSpV(cusparseSpMatDescr_t *P_matrix, cusparseSpVe
 	cudaMalloc(&res_data, raw_result_vec_size * sizeof(double));
 	cudaMalloc(&res_indexes, raw_result_vec_size * sizeof(int));
 
-	CUDA_BLAEQ_SpMSpV_kernel(row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
-
+	//CUDA_BLAEQ_SpMSpV_kernel <<<NUM_BLOCKS, NUM_THREADS >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+	CUDA_BLAEQ_SpMSpV(row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*)indexes, (int*)indptr, vec_nnz, (double*)vec_data, (int*)vec_indexes, res_data, res_indexes, NUM_BLOCKS, NUM_THREADS);
 
 	int* cleaned_indexes = thrust::remove(res_indexes, res_indexes + raw_result_vec_size, 0);
 	double* cleaned_data = thrust::remove(res_data, res_data + raw_result_vec_size, 0.0);

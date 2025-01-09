@@ -1,12 +1,13 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include <iostream>
+#include <stdio.h>
+#include <math.h>
 
 /*
 	CUDA Kernel Functions
 */
-__global__ void CUDA_in_range_kernel(double q_min, double q_max, double relaxation, double* data, double* indices, int size, double* result_data, double* result_indices) {
+__global__ void CUDA_in_range_kernel(double q_min, double q_max, double relaxation, double* data, int* indices, int size, double* result_data, int* result_indices) {
 	// int i = threadIdx.x;
 	// c[i] = a[i] + b[i];
 	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -34,10 +35,7 @@ __global__ void CUDA_generate_P_matrix_kernel(double* M_i_d, int M_i_d_length, d
 
 
 __global__ void CUDA_BLAEQ_SpMSpV_kernel(int64_t* P_row_count, int64_t* P_col_count, int64_t* P_nnz, int MAX_COL_SIZE, double* P_data, int* P_indexes, int* P_indptr, int64_t* V_nnz, double* V_data, int* V_indexes, double* Res_data, int* Res_indexes) {
-	//Check if sizes of SpM and SpV matches
-	if (P_col_count != V_nnz) {
-		std::cerr << "Error, shape does not match during CUDA_BLAEQ_SpMSpV." << std::endl;
-	}
+
 	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (t_idx < *P_col_count) {
 		int tmp_col = V_indexes[t_idx];
@@ -54,4 +52,16 @@ __global__ void CUDA_BLAEQ_SpMSpV_kernel(int64_t* P_row_count, int64_t* P_col_co
 			Res_indexes[result_arr_start_index + i] = 0;
 		}
 	}
+}
+
+void CUDA_in_range(double q_min, double q_max, double relaxation, double* data, int* indices, int size, double* result_data, int* result_indices, int NUM_BLOCKS, int NUM_THREADS) {
+	CUDA_in_range_kernel <<<NUM_BLOCKS, NUM_THREADS>>> (double q_min, double q_max, double relaxation, double* data, int* indices, int size, double* result_data, int* result_indices);
+}
+
+void CUDA_generate_P_matrix(double* M_i_d, int M_i_d_length, double bandwidth, double* data, int* row, int* col, int NUM_BLOCKS, int NUM_THREADS) {
+	CUDA_generate_P_matrix_kernel <<<NUM_BLOCKS, NUM_THREADS>>> (double* M_i_d, int M_i_d_length, double bandwidth, double* data, int* row, int* col);
+}
+
+void CUDA_BLAEQ_SpMSpV(int64_t* P_row_count, int64_t* P_col_count, int64_t* P_nnz, int MAX_COL_SIZE, double* P_data, int* P_indexes, int* P_indptr, int64_t* V_nnz, double* V_data, int* V_indexes, double* Res_data, int* Res_indexes, int NUM_BLOCKS, int NUM_THREADS) {
+	CUDA_BLAEQ_SpMSpV_kernel <<<NUM_BLOCKS, NUM_THREADS>>> (int64_t * P_row_count, int64_t * P_col_count, int64_t * P_nnz, int MAX_COL_SIZE, double* P_data, int* P_indexes, int* P_indptr, int64_t * V_nnz, double* V_data, int* V_indexes, double* Res_data, int* Res_indexes);
 }

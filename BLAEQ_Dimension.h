@@ -1,6 +1,7 @@
 #include <algorithm>
 #include "cusparse.h"
 #include "cusparse_v2.h"
+#include "BLAEQ_CUDA_Kernels.h"
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <thrust/remove.h>
@@ -15,16 +16,19 @@ public:
 	double* Bandwidths;						// The bandwidths of each layer
 	int Dimension;
 	int L;
-	int NUM_THREADS = 256;
 	int N;
 	int K;
 	int MAX_COUNT_PER_COL = N / K;
+
+	//Configuration based on NVIDIA Card
+	int NUM_BLOCKS = 12;
+	int NUM_THREADS = 256;
 
 	BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle);
 
 	void BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle);
 
-	void BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* input_result, cusparseSpVecDescr_t* output_result);
+	void BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* output_result);
 
 private:
 	int compute_layer(int N, int k);

@@ -79,13 +79,15 @@
   <ItemGroup>
     <CudaCompile Include="BLAEQ.cu" />
     <CudaCompile Include="BLAEQ_Dimension.cu" />
-    <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BLAEQ.h" />
+    <ClInclude Include="BLAEQ_CUDA_Kernels.h" />
     <ClInclude Include="BLAEQ_Dimension.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BLAEQ_CUDA_Kernels.cu" />
+    <ClCompile Include="main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
