@@ -1,12 +1,14 @@
 #include <algorithm>
 #include "cusparse.h"
 #include "cusparse_v2.h"
-#include "BLAEQ_CUDA_Kernels.h"
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <thrust/remove.h>
 #include <iostream>
 #include <stdio.h>
+
+#define NUM_BLOCKS = 12;
+#define NUM_THREADS = 256;
 
 class BLAEQ_Dimension {
 public:
@@ -20,9 +22,9 @@ public:
 	int K;
 	int MAX_COUNT_PER_COL = N / K;
 
-	//Configuration based on NVIDIA Card
-	int NUM_BLOCKS = 12;
-	int NUM_THREADS = 256;
+	////Configuration based on NVIDIA Card
+	//int NUM_BLOCKS = 12;
+	//int NUM_THREADS = 256;
 
 	BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle);
 
@@ -44,6 +46,4 @@ private:
 	void _logical_in_range_judgement(double min, double max, cusparseSpVecDescr_t* input, cusparseSpVecDescr_t* output);
 
 	void _BLAEQ_SpMSpV(cusparseSpMatDescr_t* P_matrix, cusparseSpVecDescr_t* input_vec, cusparseSpVecDescr_t* result_vec);
-
-
 };

@@ -1,0 +1,317 @@
+﻿  Compiling CUDA source file BLAEQ.cpp...
+  Compiling CUDA source file BLAEQ_Dimension.cpp...
+  
+  C:\Users\xavie\source\repos\BLAEQ_CUDA>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.39.33519\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include" -I"C:\Program Files\Vcpkg\installed\x64-windows\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include"     --keep-dir BLAEQ_CUDA\x64\Release  -maxrregcount=0   --machine 64 --compile -cudart static    -DWIN32 -DWIN64 -DNDEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /O2 /FS   /MD " -Xcompiler "/FdBLAEQ_CUDA\x64\Release\vc143.pdb" -o C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_CUDA\x64\Release\BLAEQ.cpp.obj "C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp" 
+  
+  C:\Users\xavie\source\repos\BLAEQ_CUDA>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.39.33519\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include" -I"C:\Program Files\Vcpkg\installed\x64-windows\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include"     --keep-dir BLAEQ_CUDA\x64\Release  -maxrregcount=0   --machine 64 --compile -cudart static    -DWIN32 -DWIN64 -DNDEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /O2 /FS   /MD " -Xcompiler "/FdBLAEQ_CUDA\x64\Release\vc143.pdb" -o C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_CUDA\x64\Release\BLAEQ_Dimension.cpp.obj "C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp" 
+C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/include\cuda.h(21757): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/include\cub/warp/specializations/warp_exchange_shfl.cuh(1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(35): warning #549-D: variable "M_ip1_d" is used before its value is set
+    		_generate_P_matrix(M_i_d, N_i_d, bandwidth, P_Matrices[(L - 1) - i], M_ip1_d, N_ip1_d, cusparseHandle); 
+    		                                                                     ^
+  
+  Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(35): warning #549-D: variable "N_ip1_d" is used before its value is set
+    		_generate_P_matrix(M_i_d, N_i_d, bandwidth, P_Matrices[(L - 1) - i], M_ip1_d, N_ip1_d, cusparseHandle); 
+    		                                                                              ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected an expression
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                 ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : too few arguments in function call
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                     ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected a ">>>"
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                     ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected a "("
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                     ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected an expression
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                      ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected an expression
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                        ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected a ")"
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                             ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : identifier "CUDA_generate_P_matrix_kernel" is undefined
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(116): error : expected an expression
+    	CUDA_generate_P_matrix_kernel <<<= 12;, = 256; >>> (M_i_d, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
+    	                                               ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(119): warning #549-D: variable "P_matrix_coo" is used before its value is set
+    	cusparseCreateCoo(P_matrix_coo, P_row_count, P_col_count, P_nnz_count, P_rows, P_cols, P_data, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
+    	                  ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(150): warning #549-D: variable "P_indptr_balanced" is used before its value is set
+    	_balance_P_matrix(MAX_COUNT_PER_COL, P_index_count_csc, P_indptr_count_csc, P_indptr_csc, M_ip1_d_local, P_indptr_balanced, M_ip1_d_local_balanced);
+    	                                                                                                         ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(150): warning #549-D: variable "M_ip1_d_local_balanced" is used before its value is set
+    	_balance_P_matrix(MAX_COUNT_PER_COL, P_index_count_csc, P_indptr_count_csc, P_indptr_csc, M_ip1_d_local, P_indptr_balanced, M_ip1_d_local_balanced);
+    	                                                                                                                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(241): warning #549-D: variable "size" is used before its value is set
+    	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+    	                         ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(241): warning #549-D: variable "nnz" is used before its value is set
+    	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+    	                               ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(241): warning #549-D: variable "index_type" is used before its value is set
+    	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+    	                                                    ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(241): warning #549-D: variable "index_base" is used before its value is set
+    	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+    	                                                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(241): warning #549-D: variable "data_type" is used before its value is set
+    	cusparseSpVecGet(*input, size, nnz, & index, &data, index_type, index_base, data_type);
+    	                                                                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected an expression
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                        ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : too few arguments in function call
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected a ">>>"
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected a "("
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected an expression
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                             ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected an expression
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                               ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected a ")"
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                                    ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : identifier "CUDA_in_range_kernel" is undefined
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(251): error : expected an expression
+    	CUDA_in_range_kernel <<<= 12;, = 256; >>> (min, max, Bandwidths[Dimension] / 2, (double*) data, (int*) index, *size, tmp_result_data, tmp_result_indexes);
+    	                                      ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "row_count" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                          ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "col_count" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                     ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "nnz_count" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "indptr" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                           ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "indexes" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                   ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "data" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "indptr_type" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                                  ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "indexes_type" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                                               ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "idx_base" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                                                             ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(275): warning #549-D: variable "dataType" is used before its value is set
+    	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
+    	                                                                                                                       ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_size" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                             ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_nnz" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                       ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_indexes" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_data" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                                             ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_index_type" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                                                       ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_index_base" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                                                                       ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(286): warning #549-D: variable "vec_data_type" is used before its value is set
+    	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
+    	                                                                                                       ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected an expression
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : too few arguments in function call
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected a ">>>"
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected a "("
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected an expression
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                 ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected an expression
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                   ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected a ")"
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                        ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : identifier "CUDA_BLAEQ_SpMSpV_kernel" is undefined
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp(296): error : expected an expression
+    	CUDA_BLAEQ_SpMSpV_kernel <<<= 12;, = 256; >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
+    	                                          ^
+  
+  27 errors detected in the compilation of "C:/Users/xavie/source/repos/BLAEQ_CUDA/BLAEQ_Dimension.cpp".
+  BLAEQ_Dimension.cpp
+C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v170\BuildCustomizations\CUDA 12.3.targets(799,9): error MSB3721: 命令“"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.39.33519\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include" -I"C:\Program Files\Vcpkg\installed\x64-windows\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include"     --keep-dir BLAEQ_CUDA\x64\Release  -maxrregcount=0   --machine 64 --compile -cudart static    -DWIN32 -DWIN64 -DNDEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /O2 /FS   /MD " -Xcompiler "/FdBLAEQ_CUDA\x64\Release\vc143.pdb" -o C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_CUDA\x64\Release\BLAEQ_Dimension.cpp.obj "C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_Dimension.cpp"”已退出，返回代码为 2。
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(3): warning C4067: 预处理器指令后有意外标记 - 应输入换行符
+C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/include\cuda.h(21757): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.3/include\cub/warp/specializations/warp_exchange_shfl.cuh(1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/arch/Default/Half.h(1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/arch/Default/BFloat16.h(1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/arch/GPU/PacketMath.h(1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/arch/Default/GenericPacketMathFunctions.h(676): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(223): warning #20012-D: __host__ annotation is ignored on a function("DenseStorage") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage(const DenseStorage&) = default;
+                   ^
+  
+  Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(223): warning #20012-D: __device__ annotation is ignored on a function("DenseStorage") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage(const DenseStorage&) = default;
+                                        ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(233): warning #20012-D: __host__ annotation is ignored on a function("operator=") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage& operator=(const DenseStorage&) = default;
+                   ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(233): warning #20012-D: __device__ annotation is ignored on a function("operator=") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage& operator=(const DenseStorage&) = default;
+                                        ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(248): warning #20012-D: __host__ annotation is ignored on a function("DenseStorage") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage(DenseStorage&&) = default;
+                   ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(248): warning #20012-D: __device__ annotation is ignored on a function("DenseStorage") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage(DenseStorage&&) = default;
+                                        ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(249): warning #20012-D: __host__ annotation is ignored on a function("operator=") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage& operator=(DenseStorage&&) = default;
+                   ^
+  
+C:\Program Files\Vcpkg\installed\x64-windows\include\Eigen\src/Core/DenseStorage.h(249): warning #20012-D: __device__ annotation is ignored on a function("operator=") that is explicitly defaulted on its first declaration
+        __declspec(__host__) __declspec(__device__) DenseStorage& operator=(DenseStorage&&) = default;
+                                        ^
+  
+C:/Program Files/Vcpkg/installed/x64-windows/include\boost/throw_exception.hpp(224): error : identifier "__builtin_FUNCSIG" is undefined
+    template<class E> __declspec(noreturn) void throw_with_location( E && e, boost::source_location const & loc = ::boost::source_location(__builtin_FILE(), __builtin_LINE(), __builtin_FUNCSIG(), __builtin_COLUMN()) )
+                                                                                                                                                                               ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(30): warning #549-D: variable "result_count_ptr" is used before its value is set
+    		BLAEQ_Single_Query(&ranges[Q_size * i], result_count_ptr, result);
+    		                                        ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(30): warning #549-D: variable "result" is used before its value is set
+    		BLAEQ_Single_Query(&ranges[Q_size * i], result_count_ptr, result);
+    		                                                          ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "size" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                              ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "nnz" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                    ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "indices" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                         ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "values" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                                  ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "idxType" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                                          ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "idxBase" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                                                   ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(54): warning #549-D: variable "valueType" is used before its value is set
+    		cusparseSpVecGet(*dim_result, size, nnz, indices, values, idxType, idxBase, valueType);
+    		                                                                            ^
+  
+C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp(62): warning #549-D: variable "result_start" is used before its value is set
+    			int* result_end = thrust::set_intersection((int*)indices, (int*)indices + *nnz, result, result + *result_count_ptr, result_start);
+    			                                                                                                                    ^
+  
+  1 error detected in the compilation of "C:/Users/xavie/source/repos/BLAEQ_CUDA/BLAEQ.cpp".
+  BLAEQ.cpp
+C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Microsoft\VC\v170\BuildCustomizations\CUDA 12.3.targets(799,9): error MSB3721: 命令“"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.39.33519\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include" -I"C:\Program Files\Vcpkg\installed\x64-windows\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3\include"     --keep-dir BLAEQ_CUDA\x64\Release  -maxrregcount=0   --machine 64 --compile -cudart static    -DWIN32 -DWIN64 -DNDEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /O2 /FS   /MD " -Xcompiler "/FdBLAEQ_CUDA\x64\Release\vc143.pdb" -o C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ_CUDA\x64\Release\BLAEQ.cpp.obj "C:\Users\xavie\source\repos\BLAEQ_CUDA\BLAEQ.cpp"”已退出，返回代码为 2。

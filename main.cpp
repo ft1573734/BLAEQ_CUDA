@@ -1,4 +1,4 @@
-#include "BLAEQ.cu"
+#include "BLAEQ.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -7,6 +7,8 @@
 void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set);
 void Load_Queries(std::string path, int D, double* workload, int Q_count);
 std::vector<std::string> splitLine(const std::string& line, char delimiter);
+
+
 
 int main() {
 	//Load data
@@ -60,7 +62,7 @@ void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set) {
 			ite++;
 		}
 	}
-	free(cloud);
+	delete(cloud);
 	data_set = &original_dataset;
 }
 

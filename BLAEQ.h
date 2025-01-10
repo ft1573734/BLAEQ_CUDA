@@ -29,3 +29,16 @@ public:
 
 private:
 };
+
+
+class Multidimensional_Arr {
+public:
+	int D;
+	int N;
+	double* data;
+	Multidimensional_Arr(int N, int D);
+
+	void getDim(int dim, double* result, int* size);
+
+	void getRecord(int n, double* result, int* size);
+};
