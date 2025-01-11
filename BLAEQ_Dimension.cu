@@ -6,62 +6,12 @@
 #include <thrust/remove.h>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-
-
-/*
-	CUDA Kernel Functions
-*/
-__global__ void CUDA_in_range_kernel(double q_min, double q_max, double relaxation, double* data, int* indices, int size, double* result_data, int* result_indices) {
-	// int i = threadIdx.x;
-	// c[i] = a[i] + b[i];
-	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
-	if (t_idx < size) {
-		if (q_min <= data[t_idx] <= q_max) {
-			result_data[t_idx] = data[t_idx];
-			result_indices[t_idx] = indices[t_idx];
-		}
-		else {
-			result_data[t_idx] = 0.0;
-			result_indices[t_idx] = 0;
-		}
-	}
-}
-
-__global__ void CUDA_generate_P_matrix_kernel(double* M_i_d, int M_i_d_length, double bandwidth, double* data, int* row, int* col) {
-	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
-	if (t_idx < M_i_d_length) {
-		int bin_index = floor(M_i_d[t_idx] / bandwidth);
-		col[t_idx] = t_idx;
-		row[t_idx] = bin_index;
-		data[t_idx] = bandwidth * bin_index + bandwidth / 2;
-	}
-}
-
-
-__global__ void CUDA_BLAEQ_SpMSpV_kernel(int64_t* P_row_count, int64_t* P_col_count, int64_t* P_nnz, int MAX_COL_SIZE, double* P_data, int* P_indexes, int* P_indptr, int64_t* V_nnz, double* V_data, int* V_indexes, double* Res_data, int* Res_indexes) {
-
-	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
-	if (t_idx < *P_col_count) {
-		int tmp_col = V_indexes[t_idx];
-		int P_start_index = P_indptr[tmp_col];
-		int P_end_index = P_indptr[tmp_col + 1];
-		int tmp_col_size = P_end_index - P_start_index;
-		int result_arr_start_index = t_idx * MAX_COL_SIZE;
-		for (int i = 0; i < tmp_col_size; i++) {
-			Res_data[result_arr_start_index + i] = P_data[P_start_index + i] * V_data[t_idx];
-			Res_indexes[result_arr_start_index + i] = P_indexes[P_start_index + i];
-		}
-		for (int i = tmp_col_size; i < MAX_COL_SIZE; i++) {
-			Res_data[result_arr_start_index + i] = 0.0;
-			Res_indexes[result_arr_start_index + i] = 0;
-		}
-	}
-}
+#include <iostream>
 
 
 BLAEQ_Dimension::BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle) {
 	Dimension = dim;
-	L = compute_layer(N, K);
+	L = _compute_layer(N, K);
 	cudaMalloc(&P_Matrices, L * sizeof(void*));	//Allocating space for P_matrix pointers
 	cudaMalloc(&Bandwidths, L * sizeof(double));	//Allocating space for bandwidths
 	N = N;
@@ -78,11 +28,20 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 	for (int i = 0; i < L; i++) {
 		double bandwidth = _bandwidth_generator(M_i_d, N_i_d, K);
 		Bandwidths[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
-		double* M_ip1_d;
-		int N_ip1_d;
-		_generate_P_matrix(M_i_d, N_i_d, bandwidth, P_Matrices[(L - 1) - i], M_ip1_d, N_ip1_d, cusparseHandle); //Store P_Matrices in reverse order just like bandwidths.
-		M_i_d = M_ip1_d;
-		N_i_d = N_ip1_d;
+		double* M_ip1_d = NULL;
+		int* N_ip1_d = NULL;
+
+		double* balanced_M_ip1_d = NULL;
+		cusparseSpMatDescr_t* tmp_P_matrix = NULL;
+		cusparseSpMatDescr_t* balanced_P_matrix = NULL;
+		kernel.Generate_P_Matrix(M_i_d, N_i_d, bandwidth, tmp_P_matrix, M_ip1_d, N_ip1_d, cusparseHandle);
+
+		kernel.Balance_P_Matrix(tmp_P_matrix, balanced_P_matrix, M_ip1_d, balanced_M_ip1_d, N_ip1_d);
+
+		P_Matrices[(L - 1) - i] = balanced_P_matrix;
+
+		M_i_d = balanced_M_ip1_d;
+		N_i_d = *N_ip1_d;
 	}
 	int* coarsest_mesh_indices;
 	cudaMalloc(&coarsest_mesh_indices, N_i_d * sizeof(int));
@@ -90,6 +49,7 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 		coarsest_mesh_indices[i] = i;
 	}
 	cusparseCreateSpVec(coarsestMesh, N_i_d, N_i_d, coarsest_mesh_indices, M_i_d, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
+
 
 }
 
@@ -101,11 +61,11 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVe
 
 	this_layer = Coarsest_Mesh;
 	for (int i = 0; i < L; i++) {
-		_logical_in_range_judgement(min, max, this_layer, logical_result);
+		kernel.In_Range(min, max, Bandwidths[Dimension] / 2, this_layer, logical_result);
 		cusparseSpMatDescr_t* P_matrix = P_Matrices[i];
-		_BLAEQ_SpMSpV(P_matrix, logical_result, next_layer);
+		kernel.SpMSpV(P_matrix, logical_result, next_layer);
 		this_layer = next_layer;
-		//CUDA_in_range(double q_min, double q_max, double relaxation, double* data, double* indices, double* result_data, double* result_indices, int size)
+
 	}
 	result = this_layer;
 }
@@ -117,7 +77,7 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVe
 *
 */
 
-int BLAEQ_Dimension::compute_layer(int N, int k) {
+int BLAEQ_Dimension::_compute_layer(int N, int k) {
 	return log2(N) / log2(k) + 1;
 }
 
@@ -144,7 +104,7 @@ double BLAEQ_Dimension::_compute_range(double* vector, int size) {
 	//return max_val - min_val;
 	return max_val; //Setting the lowerbound to 0 manually, seems more logical.
 }
-
+/*
 void BLAEQ_Dimension::_generate_P_matrix(double* M_i_d, int M_i_d_length, double bandwidth, cusparseSpMatDescr_t* P_matrix_csc_balanced, double* M_ip1_d, int M_ip1_length, cusparseHandle_t* cusparseHandle) {
 	//Initializing P_matrix inn COO format
 	int P_row_count = M_i_d_length;
@@ -203,79 +163,7 @@ void BLAEQ_Dimension::_generate_P_matrix(double* M_i_d, int M_i_d_length, double
 	cusparseCreateCsc(P_matrix_csc_balanced, P_row_count, P_col_count, P_nnz_count, P_indptr_balanced, P_index_csc, P_data_csc, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
 
 }
-void BLAEQ_Dimension::_balance_P_matrix(int MAX_BIN_SIZE, int M_index_count, int M_indptr_count, int* M_indptr, double* V_data, int* M_indptr_balanced, double* V_data_balanced) {
-	//The code below is used for balancing the P matrix, such that the largest column size does not exceed MAX_COUNT_PER_COL.
-	/*
-		This part of the logic is implemented as follows:
-		1.	Copy the first element into balanced_P directly;
-		2.	For later elements:
-		3.		Compare the temporary element with its previous element;
-		4.		If the gap is smaller than MAX_COUNT_PER_COL, write temporary element into balanced_P directly;
-		5.		If the gap is larger, write prev + MAX_COUNT_PER_COL into balanced_P;
-		6.		Update prev = prev + MAX_COUNT_PER_COL, offset += 1;
-		7.		Goto step 3;
-		8.	Repeat 1-7 until balanced P indptr is built.
-		NOTE: the indexes and data of P is identical to balanced_P, no change is required.
-	*/
-	int* balanced_indptr_buffer;
-	double* balancd_V_data_buffer;
-	int balanced_bin_count_upperbound = M_indptr_count + (N / MAX_COUNT_PER_COL);
 
-	cudaMalloc(&balanced_indptr_buffer, balanced_bin_count_upperbound * sizeof(int));
-	cudaMalloc(&balancd_V_data_buffer, balanced_bin_count_upperbound * sizeof(double));
-
-	int balanced_P_col_count_csc = M_index_count;
-	int balanced_array_offset = 0;
-	for (int i = 0; i < M_indptr_count; i++) {
-		int tmp_csc_index = M_indptr[i];
-		int prev_csc_index = 0;
-		if (i == 0) {
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
-			prev_csc_index = tmp_csc_index;
-
-			balancd_V_data_buffer[i + balanced_array_offset] = V_data[i];
-		}
-		else if (tmp_csc_index - prev_csc_index <= MAX_COUNT_PER_COL) {
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
-			prev_csc_index = tmp_csc_index;
-
-			balancd_V_data_buffer[i + balanced_array_offset] = V_data[i];
-		}
-		else if (tmp_csc_index - prev_csc_index > MAX_COUNT_PER_COL) {
-			while (tmp_csc_index - prev_csc_index > MAX_COUNT_PER_COL) {
-				balanced_indptr_buffer[i + balanced_array_offset] = prev_csc_index + MAX_COUNT_PER_COL;
-
-				balancd_V_data_buffer[i + balanced_array_offset] = V_data[i];
-
-				balanced_array_offset += 1;
-				prev_csc_index += MAX_COUNT_PER_COL;
-			}
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
-			prev_csc_index = tmp_csc_index;
-		}
-		else {
-			std::cerr << "WTF??? The program should never reach here. Error when calling function _generate_P_matrix()." << std::endl;
-		}
-	}
-	int balanced_M_indptr_count = M_indptr_count + balanced_array_offset;
-
-	int* result_balanced_indptr;
-	double* result_V_data;
-
-
-	cudaMalloc(&result_balanced_indptr, balanced_M_indptr_count * sizeof(int));
-	cudaMalloc(&result_V_data, (balanced_M_indptr_count - 1) * sizeof(double)); //The '-1' operator is required since |indptr| = |col| + 1, and |V| = |col|.
-
-	for (int i = 0; i < balanced_M_indptr_count; i++) {
-		result_balanced_indptr[i] = balanced_indptr_buffer[i];
-	}
-	for (int i = 0; i < balanced_M_indptr_count - 1; i++) {
-		result_V_data[i] = balancd_V_data_buffer[i];
-	}
-
-	cudaFree(&balanced_indptr_buffer);
-	cudaFree(&balancd_V_data_buffer);
-}
 
 void BLAEQ_Dimension::_logical_in_range_judgement(double min, double max, cusparseSpVecDescr_t *input, cusparseSpVecDescr_t* output) {
 	void* index;
@@ -308,54 +196,5 @@ void BLAEQ_Dimension::_logical_in_range_judgement(double min, double max, cuspar
 	cudaFree(input);
 }
 
-void BLAEQ_Dimension::_BLAEQ_SpMSpV(cusparseSpMatDescr_t *P_matrix, cusparseSpVecDescr_t *input_vec, cusparseSpVecDescr_t *result_vec) {
 
-	int64_t* row_count;
-	int64_t* col_count;
-	int64_t* nnz_count;
-	void** indptr;
-	void** indexes;
-	void** data;
-	cusparseIndexType_t* indptr_type;
-	cusparseIndexType_t* indexes_type;
-	cusparseIndexBase_t* idx_base;
-	cudaDataType* dataType;
-	cusparseCscGet(*P_matrix, row_count, col_count, nnz_count, indptr, indexes, data, indptr_type, indexes_type, idx_base, dataType);
-
-
-	void** vec_indexes;
-	void** vec_data;
-	int64_t* vec_size;
-	int64_t* vec_nnz;
-	cusparseIndexType_t* vec_index_type;
-	cusparseIndexBase_t* vec_index_base;
-	cudaDataType* vec_data_type;
-
-	cusparseSpVecGet(*input_vec, vec_size, vec_nnz, vec_indexes, vec_data, vec_index_type, vec_index_base, vec_data_type);
-
-	int* res_indexes;
-	double* res_data;
-
-	int raw_result_vec_size = MAX_COUNT_PER_COL * *col_count;
-		
-	cudaMalloc(&res_data, raw_result_vec_size * sizeof(double));
-	cudaMalloc(&res_indexes, raw_result_vec_size * sizeof(int));
-
-	CUDA_BLAEQ_SpMSpV_kernel <<<NUM_BLOCKS, NUM_THREADS >>> (row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*) indexes, (int*) indptr, vec_nnz, (double*) vec_data, (int*) vec_indexes, res_data, res_indexes);
-	//CUDA_BLAEQ_SpMSpV(row_count, col_count, nnz_count, MAX_COUNT_PER_COL, (double*)data, (int*)indexes, (int*)indptr, vec_nnz, (double*)vec_data, (int*)vec_indexes, res_data, res_indexes, NUM_BLOCKS, NUM_THREADS);
-
-	int* cleaned_indexes = thrust::remove(res_indexes, res_indexes + raw_result_vec_size, 0);
-	double* cleaned_data = thrust::remove(res_data, res_data + raw_result_vec_size, 0.0);
-
-	if (cleaned_indexes - res_indexes != cleaned_data - res_data) {
-		std::cerr << "WTF" << std::endl;
-	}
-
-	int cleaned_res_size = cleaned_indexes - res_indexes;
-	cusparseCreateSpVec(result_vec, *row_count, cleaned_res_size, cleaned_indexes, cleaned_data, *vec_index_type, *vec_index_base, *vec_data_type);
-
-	cudaFree(vec_indexes);
-	cudaFree(vec_data);
-}
-
-
+*/

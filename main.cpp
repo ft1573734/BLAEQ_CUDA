@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 
+#define BOOST_DISABLE_CURRENT_LOCATION
+
 void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set);
 void Load_Queries(std::string path, int D, double* workload, int Q_count);
 std::vector<std::string> splitLine(const std::string& line, char delimiter);
@@ -12,6 +14,7 @@ std::vector<std::string> splitLine(const std::string& line, char delimiter);
 
 int main() {
 	//Load data
+	std::cout << "Hello world!" << std::endl;
 	std::string input_dir = "D:\\raw_data\\synthetic.pcd";
 	std::string input_query = "D:\\raw_data\\queries.txt";
 	Multidimensional_Arr* dataset;

@@ -14,6 +14,8 @@
 #include <cstdlib>
 #include <pcl/point_cloud.h>
 
+#define BOOST_DISABLE_CURRENT_LOCATION
+
 class BLAEQ {
 public:
 	int N;

@@ -6,9 +6,9 @@
 #include <thrust/remove.h>
 #include <iostream>
 #include <stdio.h>
+#include "BLAEQ_CUDA_Kernel.h"
 
-#define NUM_BLOCKS = 12;
-#define NUM_THREADS = 256;
+#define BOOST_DISABLE_CURRENT_LOCATION
 
 class BLAEQ_Dimension {
 public:
@@ -22,9 +22,7 @@ public:
 	int K;
 	int MAX_COUNT_PER_COL = N / K;
 
-	////Configuration based on NVIDIA Card
-	//int NUM_BLOCKS = 12;
-	//int NUM_THREADS = 256;
+	BLAEQ_CUDA_Kernel kernel = BLAEQ_CUDA_Kernel(MAX_COUNT_PER_COL);
 
 	BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle);
 
@@ -33,7 +31,7 @@ public:
 	void BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* output_result);
 
 private:
-	int compute_layer(int N, int k);
+	int _compute_layer(int N, int k);
 
 	double _bandwidth_generator(double* vector, int size, int K);
 
