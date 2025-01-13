@@ -3,10 +3,11 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cstdlib>
 
 #define BOOST_DISABLE_CURRENT_LOCATION
 
-void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set);
+void Load_Pcd_Data(std::string path, Multidimensional_Arr*& data_set);
 void Load_Queries(std::string path, int D, double* workload, int Q_count);
 std::vector<std::string> splitLine(const std::string& line, char delimiter);
 
@@ -15,12 +16,18 @@ std::vector<std::string> splitLine(const std::string& line, char delimiter);
 int main() {
 	//Load data
 	std::cout << "Hello world!" << std::endl;
-	std::string input_dir = "D:\\raw_data\\synthetic.pcd";
-	std::string input_query = "D:\\raw_data\\queries.txt";
-	Multidimensional_Arr* dataset;
+	std::string input_dir = "D:\\raw_data\\BLAEQ_PCL\\synthetic.pcd";
+	std::string input_query = "D:\\raw_data\\BLAEQ_PCL\\queries.txt";
+	Multidimensional_Arr* dataset = nullptr;
 	Load_Pcd_Data(input_dir, dataset);
 
 	int K = 100;
+
+	if (dataset == nullptr) {
+		std::cerr << "Pointer dataset not initialized." << std::endl;
+		exit(EXIT_FAILURE);
+	}
+	
 
 	//Initialize BLAEQ
 	BLAEQ BLAEQ_Object = BLAEQ(dataset-> N, dataset-> D, dataset->data, K);
@@ -42,7 +49,9 @@ int main() {
 }
 
 
-void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set) {
+void Load_Pcd_Data(std::string path, Multidimensional_Arr* &data_set) {
+	const int D = 3; //When using pcl, the dimensionality is bound to be 3.
+
 	pcl::PointCloud<pcl::PointXYZ>* cloud(new pcl::PointCloud<pcl::PointXYZ>);
 	if (pcl::io::loadPCDFile<pcl::PointXYZ>(path, *cloud) == -1) {
 		PCL_ERROR("PCL: Couldn't read the file \n");
@@ -54,16 +63,14 @@ void Load_Pcd_Data(std::string path, Multidimensional_Arr* data_set) {
 	//	std::cerr << "    " << point.x << " " << point.y << " " << point.z << std::endl;
 	//}
 
-	Multidimensional_Arr original_dataset = Multidimensional_Arr(cloud->width, cloud->height);
+	Multidimensional_Arr original_dataset = Multidimensional_Arr(cloud->points.size(), D);
 	//Loading 3-D data
-	if (original_dataset.D == 3) {
-		pcl::PointCloud<pcl::PointXYZ>::const_iterator ite = cloud->cbegin();
-		for (int i = 0; i < original_dataset.N; i++) {
-			original_dataset.data[i + 0 * original_dataset.N] = ite->x;
-			original_dataset.data[i + 1 * original_dataset.N] = ite->y;
-			original_dataset.data[i + 2 * original_dataset.N] = ite->z;
-			ite++;
-		}
+	pcl::PointCloud<pcl::PointXYZ>::const_iterator ite = cloud->cbegin();
+	for (int i = 0; i < original_dataset.N; i++) {
+		original_dataset.data[i + 0 * original_dataset.N] = ite->x;
+		original_dataset.data[i + 1 * original_dataset.N] = ite->y;
+		original_dataset.data[i + 2 * original_dataset.N] = ite->z;
+		ite++;
 	}
 	delete(cloud);
 	data_set = &original_dataset;

@@ -4,17 +4,17 @@
 #include <iostream>
 
 
-BLAEQ::BLAEQ(int N, int D, double* multi_dimensional_mesh, int K) {
-	N = N;
-	D = D;
+BLAEQ::BLAEQ(int input_N, int input_D, double* multi_dimensional_mesh, int input_K) {
+	N = input_N;
+	D = input_D;
 	cusparseHandle_t cusparseHandle;
 	cusparseCreate(&cusparseHandle);
 
 	cudaMalloc(&BLAEQ_Dimensions, sizeof(void*));
 
 	for (int i = 0; i < D; i++) {
-		double* temp_mesh = &multi_dimensional_mesh[i * N];
-		BLAEQ_Dimension BLAEQ_Dim = BLAEQ_Dimension(D, K, N, temp_mesh, &cusparseHandle);
+		double* temp_mesh = &multi_dimensional_mesh[i * input_N];
+		BLAEQ_Dimension BLAEQ_Dim = BLAEQ_Dimension(input_D, input_K, input_N, temp_mesh, &cusparseHandle);
 		BLAEQ_Dimensions[i] = &BLAEQ_Dim;
 		all_bandwidths[i] = BLAEQ_Dim.Bandwidths;
 	}
@@ -67,9 +67,9 @@ void BLAEQ::BLAEQ_Single_Query(double* ranges, int64_t* result_count_ptr, int* r
 
 
 
-Multidimensional_Arr::Multidimensional_Arr(int N, int D) {
-	D = D;
-	N = N;
+Multidimensional_Arr::Multidimensional_Arr(int input_N, int input_D) {
+	D = input_D;
+	N = input_N;
 	data = static_cast<double*>(std::malloc(D * N * sizeof(double)));
 }
 

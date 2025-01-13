@@ -9,14 +9,15 @@
 #include <iostream>
 
 
-BLAEQ_Dimension::BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle) {
-	Dimension = dim;
-	L = _compute_layer(N, K);
-	cudaMalloc(&P_Matrices, L * sizeof(void*));	//Allocating space for P_matrix pointers
-	cudaMalloc(&Bandwidths, L * sizeof(double));	//Allocating space for bandwidths
-	N = N;
-	K = K;
+BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_K, int input_N, double* M, cusparseHandle_t* cusparseHandle) {
+	Dimension = input_dim;
+	L = _compute_layer(input_N, input_K);
+	cudaMalloc(&P_Matrices, BLAEQ_Dimension::L * sizeof(void*));	//Allocating space for P_matrix pointers
+	cudaMalloc(&Bandwidths, BLAEQ_Dimension::L * sizeof(double));	//Allocating space for bandwidths
+	N = input_N;
+	K = input_K;
 	cudaMalloc(&Coarsest_Mesh, L * sizeof(void*));
+	cudaDeviceSynchronize();
 	BLAEQ_Generate_P_Matrices_Dimension(P_Matrices, Coarsest_Mesh, M, cusparseHandle);
 }
 
@@ -25,9 +26,20 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 	std::cout << "Generating Prolongation matrix for dimension " << Dimension << " ...";
 	double* M_i_d = original_mesh;
 	int N_i_d = N;
+
+	//Initializing variables on RAM
+	double* Bandwdiths_on_RAM = (double*)malloc(BLAEQ_Dimension::L * sizeof(double));
+
+	if (Bandwdiths_on_RAM == nullptr) {
+		std::cerr << "Pointer Bandwdiths_on_RAM not initialized." << std::endl;
+		exit(EXIT_FAILURE);
+	}
+
+	//Filling RAM variables
+
 	for (int i = 0; i < L; i++) {
 		double bandwidth = _bandwidth_generator(M_i_d, N_i_d, K);
-		Bandwidths[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
+		Bandwdiths_on_RAM[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
 		double* M_ip1_d = NULL;
 		int* N_ip1_d = NULL;
 
@@ -43,6 +55,11 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 		M_i_d = balanced_M_ip1_d;
 		N_i_d = *N_ip1_d;
 	}
+
+	//Copying RAM variables to CUDA
+	cudaMemcpy(Bandwidths, Bandwdiths_on_RAM, L * sizeof(double), cudaMemcpyHostToDevice);
+
+
 	int* coarsest_mesh_indices;
 	cudaMalloc(&coarsest_mesh_indices, N_i_d * sizeof(int));
 	for (int i = 0; i < N_i_d; i++) {
@@ -50,6 +67,8 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 	}
 	cusparseCreateSpVec(coarsestMesh, N_i_d, N_i_d, coarsest_mesh_indices, M_i_d, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
 
+	//Freeing RAM variables
+	free(Bandwdiths_on_RAM);
 
 }
 
@@ -83,7 +102,7 @@ int BLAEQ_Dimension::_compute_layer(int N, int k) {
 
 double BLAEQ_Dimension::_bandwidth_generator(double* vector, int size, int K) {
 	int bin_count = size / K;
-	double bandwidth = _compute_range(vector, size);
+	double bandwidth = _compute_range(vector, size)/bin_count;
 	double epsilon = bandwidth / 1000;
 	return bandwidth + epsilon;
 }
