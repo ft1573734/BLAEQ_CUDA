@@ -5,6 +5,10 @@
 #include <string>
 #include <cstdlib>
 
+#ifndef DEBUG
+#define DEBUG true
+#endif
+
 #define BOOST_DISABLE_CURRENT_LOCATION
 
 void Load_Pcd_Data(std::string path, Multidimensional_Arr*& data_set);
@@ -118,3 +122,4 @@ std::vector<std::string> splitLine(const std::string& line, char delimiter) {
 
 	return tokens;
 }
+

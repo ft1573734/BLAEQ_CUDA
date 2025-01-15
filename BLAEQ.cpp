@@ -10,11 +10,11 @@ BLAEQ::BLAEQ(int input_N, int input_D, double* multi_dimensional_mesh, int input
 	cusparseHandle_t cusparseHandle;
 	cusparseCreate(&cusparseHandle);
 
-	cudaMalloc(&BLAEQ_Dimensions, sizeof(void*));
+	BLAEQ_Dimensions = (BLAEQ_Dimension*)malloc(D * sizeof(BLAEQ_Dimension*));
 
 	for (int i = 0; i < D; i++) {
 		double* temp_mesh = &multi_dimensional_mesh[i * input_N];
-		BLAEQ_Dimension BLAEQ_Dim = BLAEQ_Dimension(input_D, input_K, input_N, temp_mesh, &cusparseHandle);
+		BLAEQ_Dimension BLAEQ_Dim = BLAEQ_Dimension(i, input_K, input_N, temp_mesh, &cusparseHandle);
 		BLAEQ_Dimensions[i] = &BLAEQ_Dim;
 		all_bandwidths[i] = BLAEQ_Dim.Bandwidths;
 	}

@@ -5,6 +5,7 @@
 #include "cusparse_v2.h"
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
+#include <thrust/device_ptr.h>
 #include <thrust/remove.h>
 #include <stdio.h>
 #include <math.h>
@@ -31,14 +32,20 @@ __global__ void CUDA_in_range_kernel(double q_min, double q_max, double relaxati
 	}
 }
 
-__global__ void CUDA_generate_P_matrix_kernel(double* M_i_d, unsigned int M_i_d_length, double bandwidth, double* data, int* row, int* col) 
+__global__ void CUDA_generate_P_matrix_kernel(double* M_i_d, int M_i_d_length, double bandwidth, double* data, int* row, int* col) 
 {
-
+	//int t_idx = blockIdx.x * blockDim.x + threadIdx.x;
+	//for (int i = t_idx; i < M_i_d_length; i += blockDim.x * gridDim.x) {
+	//	int bin_index = floor(M_i_d[t_idx] / bandwidth);
+	//	row[t_idx] = t_idx;
+	//	col[t_idx] = bin_index;
+	//	data[t_idx] = bandwidth * bin_index + bandwidth / 2;
+	//}
 	int t_idx = blockDim.x * blockIdx.x + threadIdx.x;
 	if (t_idx < M_i_d_length) {
 		int bin_index = floor(M_i_d[t_idx] / bandwidth);
-		col[t_idx] = t_idx;
-		row[t_idx] = bin_index;
+		row[t_idx] = t_idx;
+		col[t_idx] = bin_index;
 		data[t_idx] = bandwidth * bin_index + bandwidth / 2;
 	}
 	//return cudaStatus;
@@ -69,14 +76,15 @@ __global__ void CUDA_BLAEQ_SpMSpV_kernel(int64_t* P_row_count, int64_t* P_col_co
 BLAEQ_CUDA_Kernel::BLAEQ_CUDA_Kernel(int input_COL_SIZE_THRESHOLD) {
 	COL_SIZE_THRESHOLD = input_COL_SIZE_THRESHOLD;
 	NUM_BLOCKS = 16;
-	NUM_THREADS = 256;
+	NUM_THREADS = 512;
+	//DEBUG = true;
 
+}
+
+BLAEQ_CUDA_Kernel::BLAEQ_CUDA_Kernel(){
 
 }
 
-BLAEQ_CUDA_Kernel::~BLAEQ_CUDA_Kernel() {
-
-}
 
 void BLAEQ_CUDA_Kernel::In_Range(double min, double max, double relaxation, cusparseSpVecDescr_t* input, cusparseSpVecDescr_t* output) {
 	void* index;
@@ -109,7 +117,7 @@ void BLAEQ_CUDA_Kernel::In_Range(double min, double max, double relaxation, cusp
 }
 
 
-void BLAEQ_CUDA_Kernel::Generate_P_Matrix(double* M_i_d, int M_i_d_length, double bandwidth, cusparseSpMatDescr_t* P_matrix_csc, double* M_ip1_d, int *M_ip1_length, cusparseHandle_t* cusparseHandle) {
+void BLAEQ_CUDA_Kernel::Generate_P_Matrix(double* M_i_d, int M_i_d_length, double bandwidth, cusparseSpMatDescr_t* P_matrix_csc, double** M_ip1_d, int *M_ip1_size, cusparseHandle_t* cusparseHandle) {
 
 	// Choose which GPU to run on, change this on a multi-GPU system.
 	cudaError_t cudaStatus;
@@ -120,9 +128,20 @@ void BLAEQ_CUDA_Kernel::Generate_P_Matrix(double* M_i_d, int M_i_d_length, doubl
 	}
 
 	//Initializing P_matrix inn COO format
-	int P_row_count = M_i_d_length;
-	int P_col_count = M_i_d_length;
+	double* M_i_d_DRAM;
+	cudaStatus = cudaMalloc(&M_i_d_DRAM, M_i_d_length * sizeof(double));
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc failed!");
+		goto Error;
+	}
+	cudaMemcpy(M_i_d_DRAM, M_i_d, M_i_d_length * sizeof(double), cudaMemcpyHostToDevice);
+
+	thrust::device_ptr<double> thrust_ptr_DRAM = thrust::device_pointer_cast(M_i_d_DRAM);
+	int P_col_count = floor(*thrust::max_element(thrust_ptr_DRAM, thrust_ptr_DRAM + M_i_d_length) / bandwidth) + 1;
 	int P_nnz_count = M_i_d_length;
+	int P_row_count = M_i_d_length;
+
+	*M_ip1_size = P_col_count;
 
 	// Allocate GPU buffers for three vectors (two input, one output)
 
@@ -136,56 +155,49 @@ void BLAEQ_CUDA_Kernel::Generate_P_Matrix(double* M_i_d, int M_i_d_length, doubl
 		goto Error;
 	}
 
-	cudaStatus = cudaMalloc(&P_rows, P_row_count * sizeof(int));
+	cudaStatus = cudaMalloc(&P_rows, P_nnz_count * sizeof(int));
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc failed!");
 		goto Error;
 	}
 
-	cudaStatus = cudaMalloc(&P_cols, P_col_count * sizeof(int));
+	cudaStatus = cudaMalloc(&P_cols, P_nnz_count * sizeof(int));
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc failed!");
 		goto Error;
 	}
 
-	double* M_i_d_DRAM;
-	cudaStatus = cudaMalloc(&M_i_d_DRAM, M_i_d_length * sizeof(double));
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc failed!");
-		goto Error;
-	}
-	cudaMemcpy(M_i_d_DRAM, M_i_d, M_i_d_length * sizeof(double), cudaMemcpyHostToDevice);
+	NUM_BLOCKS = (M_i_d_length + NUM_THREADS - 1) / NUM_THREADS; // Basically equal to ceil(M_i_d_length / NUM_THREADS)
 	CUDA_generate_P_matrix_kernel <<<NUM_BLOCKS, NUM_THREADS>>> (M_i_d_DRAM, M_i_d_length, bandwidth, P_data, P_rows, P_cols);
-	//;
-	
+	free(M_i_d);
+
 
 	cusparseSpMatDescr_t P_matrix_coo = nullptr;
 	cusparseCreateCoo(&P_matrix_coo, P_row_count, P_col_count, P_nnz_count, P_rows, P_cols, P_data, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
 
+	if (DEBUG) {
+		int* debug_coo_rows = (int*)malloc(P_nnz_count * sizeof(int));
+		int* debug_coo_cols = (int*)malloc(P_nnz_count * sizeof(int));
+		double* debug_coo_data = (double*)malloc(P_nnz_count * sizeof(double));
+
+		cudaMemcpy(debug_coo_rows, P_rows, P_nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(debug_coo_cols, P_cols, P_nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(debug_coo_data, P_data, P_nnz_count * sizeof(double), cudaMemcpyDeviceToHost);
+
+		free(debug_coo_rows);
+		free(debug_coo_cols);
+		free(debug_coo_data);
+	}
+
+
 	cudaDeviceSynchronize();
 	// Converting COO to CSC
-	int P_index_count_csc = M_i_d_length;
-	int P_indptr_count_csc = floor(*thrust::max_element(M_i_d, M_i_d + M_i_d_length) / bandwidth) + 1;
-	int P_data_count_csc = M_i_d_length;
-	int M_ip1_d_size = P_indptr_count_csc - 1;
 
-	double* P_data_csc;
-	int* P_index_csc;
+	double* P_data_csc = P_data;
+	int* P_index_csc = P_rows;
 	int* P_indptr_csc;
 
-	cudaStatus = cudaMalloc(&P_data_csc, P_data_count_csc * sizeof(double));
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc failed!");
-		goto Error;
-	}
-
-	cudaStatus = cudaMalloc(&P_index_csc, P_index_count_csc * sizeof(int));
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc failed!");
-		goto Error;
-	}
-
-	cudaStatus = cudaMalloc(&P_indptr_csc, P_indptr_count_csc * sizeof(int));
+	cudaStatus = cudaMalloc(&P_indptr_csc, (P_col_count + 1) * sizeof(int));
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc failed!");
 		goto Error;
@@ -195,39 +207,65 @@ void BLAEQ_CUDA_Kernel::Generate_P_Matrix(double* M_i_d, int M_i_d_length, doubl
 	cusparseXcoo2csr(*cusparseHandle, P_cols, P_nnz_count, P_col_count, P_indptr_csc, CUSPARSE_INDEX_BASE_ZERO); //Converting COO to CSC
 	cusparseCreateCsc(P_matrix_csc, P_row_count, P_col_count, P_nnz_count, P_indptr_csc, P_index_csc, P_data_csc, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
 
+	if (DEBUG) {
+		int* indexes_host_debug = (int*)malloc(P_nnz_count * sizeof(int));
+		int* indptr_host_debug = (int*)malloc((P_col_count + 1) * sizeof(int));
+		double* data_host_debug = (double*)malloc(P_nnz_count * sizeof(double));
+
+		cudaMemcpy(indexes_host_debug, P_index_csc, P_nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(indptr_host_debug, P_indptr_csc, (P_col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(data_host_debug, P_data_csc, P_nnz_count * sizeof(double), cudaMemcpyDeviceToHost);
+
+		// Pause here and debug
+
+		free(indexes_host_debug);
+		free(indptr_host_debug);
+		free(data_host_debug);
+	}
+
 
 	cudaDeviceSynchronize();
 
 	//Constructing M_ip1_d, we not only need to construct the P_matrix, we also need to construct the next-layer vector.
-	double* M_ip1_d_local = (double*)malloc(M_ip1_d_size * sizeof(double));
+	//double* M_ip1_d_local = (double*)malloc(M_ip1_d_size * sizeof(double));
 
-	for (int i = 0; i < M_ip1_d_size; i++) {
-		M_ip1_d_local[i] = i * bandwidth + bandwidth / 2;
+	//for (int i = 0; i < M_ip1_d_size; i++) {
+	//	M_ip1_d_local[i] = i * bandwidth + bandwidth / 2;
+	//}
+
+	//cudaStatus = cudaMalloc(&M_ip1_d, M_ip1_d_size * sizeof(double));
+	//if (cudaStatus != cudaSuccess) {
+	//	fprintf(stderr, "cudaMalloc failed!");
+	//	goto Error;
+	//}
+
+	//cudaMemcpy(M_ip1_d, M_ip1_d_local, M_ip1_d_size * sizeof(double), cudaMemcpyHostToDevice);
+	//M_ip1_length = &M_ip1_d_size;
+
+	//free(M_ip1_d_local);
+
+	double* M_ip1_d_host = (double*)malloc(*M_ip1_size * sizeof(double));
+
+	for (int i = 0; i < *M_ip1_size; i++) {
+		M_ip1_d_host[i] = i * bandwidth + bandwidth / 2;
 	}
+	*M_ip1_d = M_ip1_d_host;
 
-	cudaStatus = cudaMalloc(&M_ip1_d, M_ip1_d_size * sizeof(double));
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc failed!");
-		goto Error;
-	}
 
-	cudaMemcpy(M_ip1_d, M_ip1_d_local, M_ip1_d_size * sizeof(double), cudaMemcpyHostToDevice);
-	M_ip1_length = &M_ip1_d_size;
+Error:
 
-	Error:
-	free(P_data);
-	free(P_rows);
-	free(P_cols);
+	cusparseDestroySpMat(P_matrix_coo);
 
-	free(M_i_d_DRAM);
+	cudaFree(P_cols);
+	// You MUST NOT free P_data & P_rows here, since they are used in P_matrix_csc as well.
+	// DON'T cudaFree(P_data);
+	// DON'T cudaFree(P_rows);
 
-	free(P_data_csc);
-	free(P_index_csc);
-	free(P_indptr_csc);
+	cudaFree(M_i_d_DRAM);
 }
 
 //void BLAEQ_CUDA_Kernels::Balance_P_Matrix(int MAX_BIN_SIZE, int M_index_count, int M_indptr_count, int* M_indptr, double* V_data, int* M_indptr_balanced, double* V_data_balanced) {
-void BLAEQ_CUDA_Kernel::Balance_P_Matrix(cusparseSpMatDescr_t* original_P_matrix, cusparseSpMatDescr_t* balanced_P_matrix, double* original_V, double* balanced_V, int* balanced_V_size_ptr) {
+void BLAEQ_CUDA_Kernel::Balance_P_Matrix(cusparseSpMatDescr_t original_P_matrix, cusparseSpMatDescr_t* balanced_P_matrix, double* original_V, int original_V_size, double** balanced_V, int* balanced_V_size) {
 	//The code below is used for balancing the P matrix, such that the largest column size does not exceed MAX_BIN_SIZE.
 	/*
 		This part of the logic is implemented as follows:
@@ -243,54 +281,79 @@ void BLAEQ_CUDA_Kernel::Balance_P_Matrix(cusparseSpMatDescr_t* original_P_matrix
 	*/
 
 	//Getting components of original_P_matrix
-	int64_t* row_count;
-	int64_t* col_count;
-	int64_t* nnz;
-	void** indptr;
-	void** indices;
-	void** data;
-	cusparseIndexType_t* indptr_type;
-	cusparseIndexType_t* index_type;
-	cusparseIndexBase_t* idxBase;
-	cudaDataType* data_type;
 
-	cusparseCscGet(*original_P_matrix, row_count, col_count, nnz, indptr, indices, data, indptr_type, index_type, idxBase, data_type);
+	int64_t row_count;
+	int64_t col_count;
+	int64_t nnz;
+	void* indptr_receiver;
+	void* indexes_receiver;
+	void* data_receiver;
+	cusparseIndexType_t indptr_type;
+	cusparseIndexType_t index_type;
+	cusparseIndexBase_t idxBase;
+	cudaDataType data_type;
 
-	//We only need to update the indptr of P matrix and generate new V, so we only need two buffers.
-	int* balanced_indptr_buffer; 
-	double* balancd_V_data_buffer;
-	int balanced_bin_count_upperbound = std::ceil(*col_count + *nnz / COL_SIZE_THRESHOLD);
+	//cusparseSpMatGetSize(original_P_matrix, &row_count, &col_count, &nnz);
 
-	cudaMalloc(&balanced_indptr_buffer, balanced_bin_count_upperbound * sizeof(int));
-	cudaMalloc(&balancd_V_data_buffer, balanced_bin_count_upperbound * sizeof(double));
+	cusparseCscGet(original_P_matrix, &row_count, &col_count, &nnz, &indptr_receiver, &indexes_receiver, &data_receiver, &indptr_type, &index_type, &idxBase, &data_type);
+
+	if (DEBUG) {
+		int* indexes_host_debug = (int*)malloc(nnz * sizeof(int));
+		int* indptr_host_debug = (int*)malloc((col_count + 1) * sizeof(int));
+		double* data_host_debug = (double*)malloc(nnz * sizeof(double));
+
+		cudaMemcpy(indexes_host_debug, indexes_receiver, nnz * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(indptr_host_debug, indptr_receiver, (col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+		cudaMemcpy(data_host_debug, data_receiver, nnz * sizeof(double), cudaMemcpyDeviceToHost);
+
+		// Pause here and debug
+
+		free(indexes_host_debug);
+		free(indptr_host_debug);
+		free(data_host_debug);
+	}
+
+	int* indptr = (int*)indptr_receiver;
+	int* indices = (int*)indexes_receiver;
+	double* data = (double*)data_receiver;
+
+	//We only need to update the indptr of P matrix and new V, so we only need two buffers.
+	int balanced_bin_count_upperbound = std::ceil(col_count + nnz / COL_SIZE_THRESHOLD);
+
+	int* balanced_indptr_buffer_host = (int*)malloc((balanced_bin_count_upperbound + 1) * sizeof(int));
+	double* balancd_V_data_buffer_host = (double*)malloc(balanced_bin_count_upperbound * sizeof(double));
+
+	//Since indptr is on CUDA, we need to fetch it to host.
+	int* indptr_host = (int*)malloc((col_count + 1) * sizeof(int));
+	cudaMemcpy(indptr_host, indptr, (col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
 
 	//int balanced_P_col_count_csc = *col_count;
 	int balanced_array_offset = 0;
-	for (int i = 0; i < *col_count + 1; i++) {
-		int tmp_csc_index = (int)indptr_type[i];
-		int prev_csc_index = 0;
+	int prev_csc_index = 0;
+	for (int i = 0; i < col_count + 1; i++) {
+		int tmp_csc_index = indptr_host[i];
 		if (i == 0) {
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
+			balanced_indptr_buffer_host[i + balanced_array_offset] = tmp_csc_index;
 			prev_csc_index = tmp_csc_index;
 
-			balancd_V_data_buffer[i + balanced_array_offset] = original_V[i];
+			balancd_V_data_buffer_host[i + balanced_array_offset] = original_V[i];
 		}
 		else if (tmp_csc_index - prev_csc_index <= COL_SIZE_THRESHOLD) {
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
+			balanced_indptr_buffer_host[i + balanced_array_offset] = tmp_csc_index;
 			prev_csc_index = tmp_csc_index;
 
-			balancd_V_data_buffer[i + balanced_array_offset] = original_V[i];
+			balancd_V_data_buffer_host[i + balanced_array_offset] = original_V[i];
 		}
 		else if (tmp_csc_index - prev_csc_index > COL_SIZE_THRESHOLD) {
 			while (tmp_csc_index - prev_csc_index > COL_SIZE_THRESHOLD) {
-				balanced_indptr_buffer[i + balanced_array_offset] = prev_csc_index + COL_SIZE_THRESHOLD;
+				balanced_indptr_buffer_host[i + balanced_array_offset] = prev_csc_index + COL_SIZE_THRESHOLD;
 
-				balancd_V_data_buffer[i + balanced_array_offset] = original_V[i];
+				balancd_V_data_buffer_host[i + balanced_array_offset] = original_V[i];
 
 				balanced_array_offset += 1;
 				prev_csc_index += COL_SIZE_THRESHOLD;
 			}
-			balanced_indptr_buffer[i + balanced_array_offset] = tmp_csc_index;
+			balanced_indptr_buffer_host[i + balanced_array_offset] = tmp_csc_index;
 			prev_csc_index = tmp_csc_index;
 		}
 		else {
@@ -298,31 +361,27 @@ void BLAEQ_CUDA_Kernel::Balance_P_Matrix(cusparseSpMatDescr_t* original_P_matrix
 		}
 	}
 
-
+	*balanced_V_size = col_count + balanced_array_offset;
 	
-	//Generating & returning balanced vector
-	int balanced_V_size = *col_count + balanced_array_offset;
-	balanced_V_size_ptr = &balanced_V_size;
-	cudaMalloc(&balanced_V, balanced_V_size * sizeof(double)); //The '-1' operator is required since |indptr| = |col| + 1, and |V| = |col|.
-	for (int i = 0; i < balanced_V_size; i++) {
-		balanced_V[i] = balancd_V_data_buffer[i];
-	}
-
-	cudaFree(&balanced_indptr_buffer);
-	cudaFree(&balancd_V_data_buffer);
-
+	//Generating & returning balanced vector, notice that we return vectors on host instead of on device.
+	double* balanced_V_local = (double*)malloc(*balanced_V_size * sizeof(double));
+	memcpy(balanced_V_local, balancd_V_data_buffer_host, *balanced_V_size * sizeof(double));
+	*balanced_V = balanced_V_local;
 
 	//Generating & returning balanced_P_matrix
 	int* balanced_indptr;
+	cudaMalloc(&balanced_indptr, (*balanced_V_size + 1) * sizeof(int));
+	cudaMemcpy(balanced_indptr, balanced_indptr_buffer_host, (*balanced_V_size + 1) * sizeof(int), cudaMemcpyHostToDevice);
 
-	cudaMalloc(&balanced_indptr, (balanced_V_size + 1) * sizeof(int));
 
-	for (int i = 0; i < (balanced_V_size + 1); i++) {
-		balanced_indptr[i] = balanced_indptr_buffer[i];
-	}
 
 	//Here, balanced_V_size equals column count.
-	cusparseCreateCsc(balanced_P_matrix, *row_count, balanced_V_size, *nnz, balanced_indptr, indices, data, *indptr_type, *index_type, *idxBase, *data_type);
+	cusparseCreateCsc(balanced_P_matrix, row_count, *balanced_V_size, nnz, balanced_indptr, indices, data, indptr_type, index_type, idxBase, data_type);
+
+
+	free(balancd_V_data_buffer_host);
+	free(balanced_indptr_buffer_host);
+	free(indptr_host);
 }
 
 

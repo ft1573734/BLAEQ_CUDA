@@ -21,7 +21,7 @@ public:
 	int N;
 	int D;
 	double** all_bandwidths;
-	BLAEQ_Dimension** BLAEQ_Dimensions;
+	BLAEQ_Dimension* BLAEQ_Dimensions;
 	//BLAEQ Initializer
 	BLAEQ(int N, int D, double* multi_dimensional_mesh, int K);
 

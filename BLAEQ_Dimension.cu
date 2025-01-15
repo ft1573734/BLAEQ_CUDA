@@ -4,21 +4,53 @@
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <thrust/remove.h>
+#include <thrust/sort.h>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <iostream>
 
 
 BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_K, int input_N, double* M, cusparseHandle_t* cusparseHandle) {
+	double EPSILON = 0.00001;
+
 	Dimension = input_dim;
 	L = _compute_layer(input_N, input_K);
-	cudaMalloc(&P_Matrices, BLAEQ_Dimension::L * sizeof(void*));	//Allocating space for P_matrix pointers
-	cudaMalloc(&Bandwidths, BLAEQ_Dimension::L * sizeof(double));	//Allocating space for bandwidths
+	//cudaMalloc(&P_Matrices, L * sizeof(cusparseSpMatDescr_t*));	//Allocating space for P_matrix pointers
+	//cudaMalloc(&Bandwidths, L * sizeof(double));	//Allocating space for bandwidths
+
+	P_Matrices = (cusparseSpMatDescr_t**)malloc(L * sizeof(cusparseSpMatDescr_t*));
+	Bandwidths = (double*)malloc(L * sizeof(double));
+
 	N = input_N;
 	K = input_K;
-	cudaMalloc(&Coarsest_Mesh, L * sizeof(void*));
-	cudaDeviceSynchronize();
-	BLAEQ_Generate_P_Matrices_Dimension(P_Matrices, Coarsest_Mesh, M, cusparseHandle);
+	MAX_COUNT_PER_COL = N / K;
+	kernel = BLAEQ_CUDA_Kernel(MAX_COUNT_PER_COL);
+
+	int* idx = (int*)malloc(N * sizeof(int));
+	for (int i = 0; i < N; i++) {
+		idx[i] = i;
+		M[i] = M[i] + EPSILON;
+	}
+	double* sorted_M = (double*)malloc(N * sizeof(double));
+	int* sorted_idx = (int*)malloc(N * sizeof(int));
+	BLAEQ_Sort(M, idx, &sorted_M, &sorted_idx);
+	
+
+	BLAEQ_Generate_P_Matrices_Dimension(P_Matrices, &Coarsest_Mesh, sorted_M, cusparseHandle);
+}
+
+void BLAEQ_Dimension::BLAEQ_Sort(double* original_V, int* original_idx, double** sorted_V, int** sorted_idx) {
+
+	// Wrap raw arrays with device_vector
+	thrust::device_vector<double> d_original_V(original_V, original_V + N);
+	thrust::device_vector<int> d_original_idx(original_idx, original_idx + N);
+
+	// Sort keys and rearrange values
+	thrust::sort_by_key(d_original_V.begin(), d_original_V.end(), d_original_idx.begin());
+
+	// Copy sorted data back to host
+	std::copy(d_original_V.begin(), d_original_V.end(), *sorted_V);
+	std::copy(d_original_idx.begin(), d_original_idx.end(), *sorted_idx);
 }
 
 void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle) {
@@ -27,48 +59,58 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 	double* M_i_d = original_mesh;
 	int N_i_d = N;
 
-	//Initializing variables on RAM
-	double* Bandwdiths_on_RAM = (double*)malloc(BLAEQ_Dimension::L * sizeof(double));
+	////Copying mesh to DRAM, assuming DRAM space is sufficient
+	//cudaError_t cudaStatus;
+	//double* M_i_d_DRAM;
+	//cudaStatus = cudaMalloc(&M_i_d_DRAM, N_i_d * sizeof(double));
+	//if (cudaStatus != cudaSuccess) {
+	//	fprintf(stderr, "cudaMalloc failed!");
+	//	exit(EXIT_FAILURE);
+	//}
+	//cudaMemcpy(M_i_d_DRAM, M_i_d, N_i_d * sizeof(double), cudaMemcpyHostToDevice);
+	//free(M_i_d);
 
-	if (Bandwdiths_on_RAM == nullptr) {
-		std::cerr << "Pointer Bandwdiths_on_RAM not initialized." << std::endl;
-		exit(EXIT_FAILURE);
-	}
 
 	//Filling RAM variables
 
-	for (int i = 0; i < L; i++) {
+	for (int i = 0; i < L - 1; i++) {
 		double bandwidth = _bandwidth_generator(M_i_d, N_i_d, K);
-		Bandwdiths_on_RAM[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
-		double* M_ip1_d = NULL;
-		int* N_ip1_d = NULL;
+		Bandwidths[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
+		double* M_ip1_d;
+		int N_ip1_d;
 
-		double* balanced_M_ip1_d = NULL;
-		cusparseSpMatDescr_t* tmp_P_matrix = NULL;
-		cusparseSpMatDescr_t* balanced_P_matrix = NULL;
-		kernel.Generate_P_Matrix(M_i_d, N_i_d, bandwidth, tmp_P_matrix, M_ip1_d, N_ip1_d, cusparseHandle);
+		double* balanced_M_ip1_d;
+		int balanced_N_ip1_d;
+		cusparseSpMatDescr_t tmp_P_matrix;
+		cusparseSpMatDescr_t balanced_P_matrix;
+		kernel.Generate_P_Matrix(M_i_d, N_i_d, bandwidth, &tmp_P_matrix, &M_ip1_d, &N_ip1_d, cusparseHandle);
 
-		kernel.Balance_P_Matrix(tmp_P_matrix, balanced_P_matrix, M_ip1_d, balanced_M_ip1_d, N_ip1_d);
+		kernel.Balance_P_Matrix(tmp_P_matrix, &balanced_P_matrix, M_ip1_d, N_ip1_d, &balanced_M_ip1_d, &balanced_N_ip1_d);
 
-		P_Matrices[(L - 1) - i] = balanced_P_matrix;
+		P_Matrices[(L - 1) - i] = &balanced_P_matrix;
 
 		M_i_d = balanced_M_ip1_d;
-		N_i_d = *N_ip1_d;
+		N_i_d = N_ip1_d;
 	}
 
-	//Copying RAM variables to CUDA
-	cudaMemcpy(Bandwidths, Bandwdiths_on_RAM, L * sizeof(double), cudaMemcpyHostToDevice);
 
 
-	int* coarsest_mesh_indices;
-	cudaMalloc(&coarsest_mesh_indices, N_i_d * sizeof(int));
+	int* coarsest_mesh_indices_device;
+	cudaMalloc(&coarsest_mesh_indices_device, N_i_d * sizeof(int));
+	int* coarsets_mesh_indices_host = (int*)malloc(N_i_d * sizeof(int));
 	for (int i = 0; i < N_i_d; i++) {
-		coarsest_mesh_indices[i] = i;
+		coarsets_mesh_indices_host[i] = i;
 	}
-	cusparseCreateSpVec(coarsestMesh, N_i_d, N_i_d, coarsest_mesh_indices, M_i_d, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
+	cudaMemcpy(coarsest_mesh_indices_device, coarsets_mesh_indices_host, N_i_d * sizeof(int), cudaMemcpyHostToDevice);
 
-	//Freeing RAM variables
-	free(Bandwdiths_on_RAM);
+	double* coarsest_mesh_data_device;
+	cudaMalloc(&coarsest_mesh_data_device, N_i_d * sizeof(double));
+	cudaMemcpy(coarsest_mesh_data_device, M_i_d, N_i_d * sizeof(double), cudaMemcpyHostToDevice);
+
+	cusparseSpVecDescr_t coarsestMesh_local;
+	cusparseCreateSpVec(&(coarsestMesh_local), N_i_d, N_i_d, coarsest_mesh_indices_device, coarsest_mesh_data_device, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_64F);
+
+	*coarsestMesh = coarsestMesh_local;
 
 }
 
@@ -78,7 +120,7 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVe
 	cusparseSpVecDescr_t* this_layer;
 	cusparseSpVecDescr_t* next_layer;
 
-	this_layer = Coarsest_Mesh;
+	this_layer = &Coarsest_Mesh;
 	for (int i = 0; i < L; i++) {
 		kernel.In_Range(min, max, Bandwidths[Dimension] / 2, this_layer, logical_result);
 		cusparseSpMatDescr_t* P_matrix = P_Matrices[i];

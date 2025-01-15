@@ -8,27 +8,32 @@
 #include <stdio.h>
 #include "BLAEQ_CUDA_Kernel.h"
 
+#ifndef DEBUG
+#define DEBUG true
+#endif
+
 #define BOOST_DISABLE_CURRENT_LOCATION
 
 class BLAEQ_Dimension {
 public:
 	cusparseSpMatDescr_t** P_Matrices;		// A list of prolongation matrices
-	cusparseSpVecDescr_t* Coarsest_Mesh;	// Coarsest mesh
+	cusparseSpVecDescr_t Coarsest_Mesh;	// Coarsest mesh
 	cusparseHandle_t* cusparseHandle;
 	double* Bandwidths;						// The bandwidths of each layer
 	int Dimension;
 	int L;
 	int N;
 	int K;
-	int MAX_COUNT_PER_COL = N / K;
-
-	BLAEQ_CUDA_Kernel kernel = BLAEQ_CUDA_Kernel(MAX_COUNT_PER_COL);
+	int MAX_COUNT_PER_COL;
+	BLAEQ_CUDA_Kernel kernel;
 
 	BLAEQ_Dimension(int dim, int K, int N, double* M, cusparseHandle_t* cusparseHandle);
 
 	void BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle);
 
 	void BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* output_result);
+
+	void BLAEQ_Dimension::BLAEQ_Sort(double* original_V, int* original_idx, double** sorted_V, int** sorted_idx);
 
 private:
 	int _compute_layer(int N, int k);
