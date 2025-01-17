@@ -1,25 +1,22 @@
 #include "BLAEQ_Dimension.h"
 #include "cusparse.h"
 #include "cusparse_v2.h"
-#include <thrust/device_vector.h>
-#include <thrust/extrema.h>
-#include <thrust/remove.h>
-#include <thrust/sort.h>
+
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <iostream>
 
 
-BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_K, int input_N, double* M, cusparseHandle_t* cusparseHandle) {
+BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_L, int input_K, int input_N, double* M, cusparseHandle_t* cusparseHandle) {
 	double EPSILON = 0.00001;
 
 	Dimension = input_dim;
-	L = _compute_layer(input_N, input_K);
+	L = input_L;
 	//cudaMalloc(&P_Matrices, L * sizeof(cusparseSpMatDescr_t*));	//Allocating space for P_matrix pointers
 	//cudaMalloc(&Bandwidths, L * sizeof(double));	//Allocating space for bandwidths
 
 	P_Matrices = (cusparseSpMatDescr_t**)malloc(L * sizeof(cusparseSpMatDescr_t*));
-	Bandwidths = (double*)malloc(L * sizeof(double));
+	Bandwidths = (double*)malloc((L - 1) * sizeof(double));
 
 	N = input_N;
 	K = input_K;
@@ -32,9 +29,8 @@ BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_K, int input_N, double
 		M[i] = M[i] + EPSILON;
 	}
 	double* sorted_M = (double*)malloc(N * sizeof(double));
-	int* sorted_idx = (int*)malloc(N * sizeof(int));
+	sorted_idx = (int*)malloc(N * sizeof(int));
 	BLAEQ_Sort(M, idx, &sorted_M, &sorted_idx);
-	
 
 	BLAEQ_Generate_P_Matrices_Dimension(P_Matrices, &Coarsest_Mesh, sorted_M, cusparseHandle);
 }
@@ -55,7 +51,7 @@ void BLAEQ_Dimension::BLAEQ_Sort(double* original_V, int* original_idx, double**
 
 void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle) {
 
-	std::cout << "Generating Prolongation matrix for dimension " << Dimension << " ...";
+	std::cout << "Generating Prolongation matrix for dimension " << Dimension << " ..." <<std::endl;
 	double* M_i_d = original_mesh;
 	int N_i_d = N;
 
@@ -75,7 +71,7 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 
 	for (int i = 0; i < L - 1; i++) {
 		double bandwidth = _bandwidth_generator(M_i_d, N_i_d, K);
-		Bandwidths[(L - 1) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
+		Bandwidths[(L - 2) - i] = bandwidth; //Store bandwidths in reverse order so that the coarsest layer corresponds to Bandwidths[0], second layer corresponds to Bandwidths[1] and so forth.
 		double* M_ip1_d;
 		int N_ip1_d;
 
@@ -114,7 +110,7 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 
 }
 
-void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* result) {
+void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, int** restored_indices, double** data) {
 
 	cusparseSpVecDescr_t* logical_result;
 	cusparseSpVecDescr_t* this_layer;
@@ -128,7 +124,36 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVe
 		this_layer = next_layer;
 
 	}
-	result = this_layer;
+	//result = this_layer;
+
+	//re-arrange the result back to default sequence
+	int64_t size;
+	int64_t nnz;
+	void* indices_device;
+	void* values_device;
+	cusparseIndexType_t idx_type;
+	cusparseIndexBase_t idx_base;
+	cudaDataType_t data_type;
+	cusparseSpVecGet(*this_layer, &size, &nnz, &indices_device, &values_device, &idx_type, &idx_base, &data_type);
+
+	thrust::device_vector<int> sorted_result_device((int*)indices_device, (int*)indices_device + nnz);
+	//thrust::copy((int*)indices, (int*)indices + nnz, sorted_result_device.begin());
+
+	thrust::device_vector<int> sorted_idx_device(N);
+	thrust::copy(sorted_idx, sorted_idx + N, sorted_idx_device.begin());
+
+	thrust::device_vector<int> original_result_device(nnz);
+	thrust::gather(sorted_result_device.begin(), sorted_result_device.end(), sorted_idx_device.begin(), original_result_device.begin());
+
+	int* restored_indices_host = (int*)malloc(nnz * sizeof(int));
+
+	thrust::copy(original_result_device.begin(), original_result_device.end(), restored_indices_host);
+
+	double* data_host = (double*)malloc(nnz * sizeof(double));
+	cudaMemcpy(data_host, (double*)values_device, nnz, cudaMemcpyDeviceToHost);
+
+	*data = data_host;
+	*restored_indices = restored_indices_host;
 }
 
 
@@ -137,10 +162,6 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, cusparseSpVe
 	Below are tools necessary for BLAEQ. These functions should not be called outside of BLAEQ.
 *
 */
-
-int BLAEQ_Dimension::_compute_layer(int N, int k) {
-	return log2(N) / log2(k) + 1;
-}
 
 double BLAEQ_Dimension::_bandwidth_generator(double* vector, int size, int K) {
 	int bin_count = size / K;

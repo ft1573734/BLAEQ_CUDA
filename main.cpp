@@ -41,7 +41,7 @@ int main() {
 	*/
 
 	//Load query file
-	double* workload;
+	double* workload = nullptr;
 	int Q_count = 10;
 	Load_Queries(input_query, dataset->D, workload, Q_count);
 
