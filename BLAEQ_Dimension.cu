@@ -1,7 +1,6 @@
 #include "BLAEQ_Dimension.h"
 #include "cusparse.h"
 #include "cusparse_v2.h"
-
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include <iostream>
@@ -15,12 +14,13 @@ BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_L, int input_K, int in
 	//cudaMalloc(&P_Matrices, L * sizeof(cusparseSpMatDescr_t*));	//Allocating space for P_matrix pointers
 	//cudaMalloc(&Bandwidths, L * sizeof(double));	//Allocating space for bandwidths
 
-	P_Matrices = (cusparseSpMatDescr_t**)malloc(L * sizeof(cusparseSpMatDescr_t*));
+	P_Matrices = (cusparseSpMatDescr_t*)malloc((L - 1) * sizeof(cusparseSpMatDescr_t));
 	Bandwidths = (double*)malloc((L - 1) * sizeof(double));
 
 	N = input_N;
 	K = input_K;
-	MAX_COUNT_PER_COL = N / K;
+	//MAX_COUNT_PER_COL = N / K;
+	MAX_COUNT_PER_COL = 150;
 	kernel = BLAEQ_CUDA_Kernel(MAX_COUNT_PER_COL);
 
 	int* idx = (int*)malloc(N * sizeof(int));
@@ -32,7 +32,11 @@ BLAEQ_Dimension::BLAEQ_Dimension(int input_dim, int input_L, int input_K, int in
 	sorted_idx = (int*)malloc(N * sizeof(int));
 	BLAEQ_Sort(M, idx, &sorted_M, &sorted_idx);
 
-	BLAEQ_Generate_P_Matrices_Dimension(P_Matrices, &Coarsest_Mesh, sorted_M, cusparseHandle);
+	sorted_idx_device;
+	cudaMalloc(&sorted_idx_device, N * sizeof(int));
+	cudaMemcpy(sorted_idx_device, sorted_idx, N * sizeof(int), cudaMemcpyHostToDevice);
+
+	BLAEQ_Generate_P_Matrices_Dimension(&Coarsest_Mesh, sorted_M, cusparseHandle);
 }
 
 void BLAEQ_Dimension::BLAEQ_Sort(double* original_V, int* original_idx, double** sorted_V, int** sorted_idx) {
@@ -49,7 +53,7 @@ void BLAEQ_Dimension::BLAEQ_Sort(double* original_V, int* original_idx, double**
 	std::copy(d_original_idx.begin(), d_original_idx.end(), *sorted_idx);
 }
 
-void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle) {
+void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle) {
 
 	std::cout << "Generating Prolongation matrix for dimension " << Dimension << " ..." <<std::endl;
 	double* M_i_d = original_mesh;
@@ -81,14 +85,82 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 		cusparseSpMatDescr_t balanced_P_matrix;
 		kernel.Generate_P_Matrix(M_i_d, N_i_d, bandwidth, &tmp_P_matrix, &M_ip1_d, &N_ip1_d, cusparseHandle);
 
+		if (DEBUG) {
+
+			int64_t row_count;
+			int64_t col_count;
+			int64_t nnz_count;
+			void* debug_indptr_device;
+			void* debug_idx_device;
+			void* debug_data_device;
+			cusparseIndexType_t indptr_type;
+			cusparseIndexType_t idx_type;
+			cusparseIndexBase_t idx_base;
+			cudaDataType_t data_type;
+
+			cusparseCscGet(tmp_P_matrix, &row_count, &col_count, &nnz_count, &debug_indptr_device, &debug_idx_device, &debug_data_device, &indptr_type, &idx_type, &idx_base, &data_type);
+
+			int* debug_m_idx = (int*)malloc(nnz_count * sizeof(int));
+			int* debug_m_indptr = (int*)malloc((col_count + 1) * sizeof(int));
+			double* debug_m_data = (double*)malloc(nnz_count * sizeof(double));
+
+			cudaMemcpy(debug_m_idx, (int*)debug_idx_device, nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_indptr, (int*)debug_indptr_device, (col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_data, (double*)debug_data_device, nnz_count * sizeof(double), cudaMemcpyDeviceToHost);
+
+			free(debug_m_idx);
+			free(debug_m_indptr);
+			free(debug_m_data);
+		}
+
+
+
 		kernel.Balance_P_Matrix(tmp_P_matrix, &balanced_P_matrix, M_ip1_d, N_ip1_d, &balanced_M_ip1_d, &balanced_N_ip1_d);
 
-		P_Matrices[(L - 1) - i] = &balanced_P_matrix;
+		cusparseSpMatDescr_t restored_balanced_P_matrix;
+		if (i == 0) {
+			// Restore the indexes of the lowest-level P-matrix
+			kernel.Restore_P_Index(balanced_P_matrix, this->sorted_idx_device, &restored_balanced_P_matrix);
+		}
+		else {
+			restored_balanced_P_matrix = balanced_P_matrix;
+		}
+
+		//P_Matrices[i] = &balanced_P_matrix;
+		//cusparseSpMatDescr_t* const P = &balanced_P_matrix;
+		P_Matrices[(L - 2) - i] = restored_balanced_P_matrix;
+
+		if (DEBUG) {
+
+			int64_t row_count;
+			int64_t col_count;
+			int64_t nnz_count;
+			void* debug_indptr_device;
+			void* debug_idx_device;
+			void* debug_data_device;
+			cusparseIndexType_t indptr_type;
+			cusparseIndexType_t idx_type;
+			cusparseIndexBase_t idx_base;
+			cudaDataType_t data_type;
+
+			cusparseCscGet(restored_balanced_P_matrix, &row_count, &col_count, &nnz_count, &debug_indptr_device, &debug_idx_device, &debug_data_device, &indptr_type, &idx_type, &idx_base, &data_type);
+
+			int* debug_m_idx = (int*)malloc(nnz_count * sizeof(int));
+			int* debug_m_indptr = (int*)malloc((col_count + 1) * sizeof(int));
+			double* debug_m_data = (double*)malloc(nnz_count * sizeof(double));
+
+			cudaMemcpy(debug_m_idx, debug_idx_device, nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_indptr, debug_indptr_device, (col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_data, debug_data_device, nnz_count * sizeof(double), cudaMemcpyDeviceToHost);
+
+			free(debug_m_idx);
+			free(debug_m_indptr);
+			free(debug_m_data);
+		}
 
 		M_i_d = balanced_M_ip1_d;
 		N_i_d = N_ip1_d;
 	}
-
 
 
 	int* coarsest_mesh_indices_device;
@@ -110,23 +182,58 @@ void BLAEQ_Dimension::BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t**
 
 }
 
-void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, int** restored_indices, double** data) {
+void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, int* res_size, int** restored_indices, double** data) {
 
-	cusparseSpVecDescr_t* logical_result;
-	cusparseSpVecDescr_t* this_layer;
-	cusparseSpVecDescr_t* next_layer;
+	cusparseSpVecDescr_t logical_result;
+	cusparseSpVecDescr_t this_layer;
+	cusparseSpVecDescr_t next_layer;
 
-	this_layer = &Coarsest_Mesh;
-	for (int i = 0; i < L; i++) {
-		kernel.In_Range(min, max, Bandwidths[Dimension] / 2, this_layer, logical_result);
-		cusparseSpMatDescr_t* P_matrix = P_Matrices[i];
-		kernel.SpMSpV(P_matrix, logical_result, next_layer);
+	this_layer = Coarsest_Mesh;
+	for (int i = 0; i < L - 1; i++) {
+		kernel.In_Range(min, max, Bandwidths[Dimension] / 2, this_layer, &logical_result);
+		if (logical_result == NULL) {
+			return;
+		}
+		cusparseSpMatDescr_t P_matrix = this->P_Matrices[i];
+
+		if (DEBUG) {
+
+			int64_t row_count;
+			int64_t col_count;
+			int64_t nnz_count;
+			void* debug_indptr_device;
+			void* debug_idx_device;
+			void* debug_data_device;
+			cusparseIndexType_t indptr_type;
+			cusparseIndexType_t index_type;
+			cusparseIndexBase_t idxBase;
+			cudaDataType data_type;
+
+			cusparseCscGet(P_matrix, &row_count, &col_count, &nnz_count, &debug_indptr_device, &debug_idx_device, &debug_data_device, &indptr_type, &index_type, &idxBase, &data_type);
+
+			int* debug_m_idx = (int*)malloc(nnz_count * sizeof(int));
+			int* debug_m_indptr = (int*)malloc((col_count + 1) * sizeof(int));
+			double* debug_m_data = (double*)malloc(nnz_count * sizeof(double));
+
+			cudaMemcpy(debug_m_idx, debug_idx_device, nnz_count * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_indptr, debug_indptr_device, (col_count + 1) * sizeof(int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(debug_m_data, debug_data_device, nnz_count * sizeof(double), cudaMemcpyDeviceToHost);
+
+			free(debug_m_idx);
+			free(debug_m_indptr);
+			free(debug_m_data);
+		}
+
+		kernel.SpMSpV(P_matrix, logical_result, &next_layer);
 		this_layer = next_layer;
 
 	}
 	//result = this_layer;
 
-	//re-arrange the result back to default sequence
+	kernel.In_Range(min, max, 0.0, this_layer, &logical_result);
+
+
+
 	int64_t size;
 	int64_t nnz;
 	void* indices_device;
@@ -134,26 +241,34 @@ void BLAEQ_Dimension::BLAEQ_Query_Dimension(double min, double max, int** restor
 	cusparseIndexType_t idx_type;
 	cusparseIndexBase_t idx_base;
 	cudaDataType_t data_type;
-	cusparseSpVecGet(*this_layer, &size, &nnz, &indices_device, &values_device, &idx_type, &idx_base, &data_type);
+	cusparseSpVecGet(logical_result, &size, &nnz, &indices_device, &values_device, &idx_type, &idx_base, &data_type);
 
-	thrust::device_vector<int> sorted_result_device((int*)indices_device, (int*)indices_device + nnz);
-	//thrust::copy((int*)indices, (int*)indices + nnz, sorted_result_device.begin());
+	//re-arrange the result back to default sequence
+	//thrust::device_ptr<int> sorted_result_device_thrust((int*)indices_device);
+	//int* original_idx_device;
+	//cudaMalloc(&original_idx_device, nnz * sizeof(int));
+	//thrust::device_ptr<int> restored_idx_device_thrust(original_idx_device);
+	//thrust::device_ptr<int> sorted_idx_device_thrust(sorted_idx_device);
 
-	thrust::device_vector<int> sorted_idx_device(N);
-	thrust::copy(sorted_idx, sorted_idx + N, sorted_idx_device.begin());
+	//thrust::gather(sorted_result_device_thrust, sorted_result_device_thrust + nnz, sorted_idx_device_thrust, restored_idx_device_thrust);
 
-	thrust::device_vector<int> original_result_device(nnz);
-	thrust::gather(sorted_result_device.begin(), sorted_result_device.end(), sorted_idx_device.begin(), original_result_device.begin());
+	////*restored_indices = restored_idx_device_thrust.get();
+	////*data = (double*)values_device;
 
-	int* restored_indices_host = (int*)malloc(nnz * sizeof(int));
 
-	thrust::copy(original_result_device.begin(), original_result_device.end(), restored_indices_host);
+	//int* restored_indices_host = (int*)malloc(nnz * sizeof(int));
+	//cudaMemcpy(restored_indices_host, indices_device, nnz * sizeof(int), cudaMemcpyDeviceToHost);
+	//*restored_indices = restored_indices_host;
 
-	double* data_host = (double*)malloc(nnz * sizeof(double));
-	cudaMemcpy(data_host, (double*)values_device, nnz, cudaMemcpyDeviceToHost);
+	//double* res_data_host = (double*)malloc(nnz * sizeof(double));
+	//cudaMemcpy(res_data_host, values_device, nnz * sizeof(int), cudaMemcpyDeviceToHost);
+	//*data = res_data_host;
 
-	*data = data_host;
-	*restored_indices = restored_indices_host;
+	*restored_indices = (int*)indices_device;
+	*data = (double*)values_device;
+	*res_size = nnz;
+
+
 }
 
 

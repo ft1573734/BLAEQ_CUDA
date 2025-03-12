@@ -6,6 +6,9 @@
 #include <thrust/device_vector.h>
 #include <thrust/extrema.h>
 #include <thrust/remove.h>
+#include <thrust/set_operations.h>
+#include <thrust/execution_policy.h>
+#include <thrust/sort.h>
 #include <iostream>
 #include <stdio.h>
 #include "BLAEQ_Dimension.h"
@@ -13,6 +16,12 @@
 #include <pcl/io/pcd_io.h>
 #include <cstdlib>
 #include <pcl/point_cloud.h>
+#include <chrono>
+
+
+#ifndef DEBUG
+#define DEBUG true
+#endif
 
 #define BOOST_DISABLE_CURRENT_LOCATION
 
@@ -22,7 +31,7 @@ public:
 	int D;
 	int L;
 	double* all_bandwidths;
-	BLAEQ_Dimension** BLAEQ_Dimensions;
+	BLAEQ_Dimension* BLAEQ_Dimensions;
 	//BLAEQ Initializer
 	BLAEQ(int N, int D, double* multi_dimensional_mesh, int K);
 

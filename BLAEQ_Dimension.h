@@ -10,16 +10,17 @@
 #include <iostream>
 #include <stdio.h>
 #include "BLAEQ_CUDA_Kernel.h"
+#include "debug.h"
 
 #ifndef DEBUG
-#define DEBUG true
+#define DEBUG false
 #endif
 
 #define BOOST_DISABLE_CURRENT_LOCATION
 
 class BLAEQ_Dimension {
 public:
-	cusparseSpMatDescr_t** P_Matrices;		// A list of prolongation matrices
+	cusparseSpMatDescr_t* P_Matrices;		// A list of prolongation matrices
 	cusparseSpVecDescr_t Coarsest_Mesh;	// Coarsest mesh
 	cusparseHandle_t* cusparseHandle;
 
@@ -30,17 +31,18 @@ public:
 	int K;
 	int MAX_COUNT_PER_COL;
 	int* sorted_idx;
+	int* sorted_idx_device;
 	BLAEQ_CUDA_Kernel kernel;
 
 	BLAEQ_Dimension(int dim, int L, int K, int N, double* M, cusparseHandle_t* cusparseHandle);
 
-	void BLAEQ_Generate_P_Matrices_Dimension(cusparseSpMatDescr_t** P_Matrices, cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle);
+	void BLAEQ_Generate_P_Matrices_Dimension(cusparseSpVecDescr_t* coarsestMesh, double* original_mesh, cusparseHandle_t* cusparseHandle);
 
 	//void BLAEQ_Query_Dimension(double min, double max, cusparseSpVecDescr_t* output_result);
 
 	void BLAEQ_Sort(double* original_V, int* original_idx, double** sorted_V, int** sorted_idx);
 
-	void BLAEQ_Query_Dimension(double min, double max, int** restored_indices, double** data);
+	void BLAEQ_Query_Dimension(double min, double max, int* res_size, int** restored_indices, double** data);
 
 private:
 

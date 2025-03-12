@@ -4,15 +4,16 @@
 #include <sstream>
 #include <string>
 #include <cstdlib>
+#include "debug.h"
+#include <cuda_profiler_api.h>
 
-#ifndef DEBUG
-#define DEBUG true
-#endif
+
 
 #define BOOST_DISABLE_CURRENT_LOCATION
 
-void Load_Pcd_Data(std::string path, Multidimensional_Arr*& data_set);
-void Load_Queries(std::string path, int D, double* workload, int Q_count);
+Multidimensional_Arr Load_Pcd_Data(std::string path);
+void Load_Queries(std::string path, int D, int Q_count, double** workload);
+void f(std::string path);
 std::vector<std::string> splitLine(const std::string& line, char delimiter);
 
 
@@ -20,40 +21,38 @@ std::vector<std::string> splitLine(const std::string& line, char delimiter);
 int main() {
 	//Load data
 	std::cout << "Hello world!" << std::endl;
-	std::string input_dir = "D:\\raw_data\\BLAEQ_PCL\\synthetic.pcd";
-	std::string input_query = "D:\\raw_data\\BLAEQ_PCL\\queries.txt";
-	Multidimensional_Arr* dataset = nullptr;
-	Load_Pcd_Data(input_dir, dataset);
+	std::string input_dir = "data\\synthetic.pcd";
+	std::string input_query = "data\\queries.txt";
+	Multidimensional_Arr dataset = Load_Pcd_Data(input_dir);
 
 	int K = 100;
 
-	if (dataset == nullptr) {
-		std::cerr << "Pointer dataset not initialized." << std::endl;
-		exit(EXIT_FAILURE);
-	}
-	
+	//Load query file
+	int Q_count = 10;
+	double* workload;
 
-	//Initialize BLAEQ
-	BLAEQ BLAEQ_Object = BLAEQ(dataset-> N, dataset-> D, dataset->data, K);
+	Load_Queries(input_query, dataset.D, Q_count, &workload);
+
+	BLAEQ BLAEQ_Object = BLAEQ(dataset.N, dataset.D, dataset.data, K);
+
 
 	/*
 	* Perform Query
 	*/
 
-	//Load query file
-	double* workload = nullptr;
-	int Q_count = 10;
-	Load_Queries(input_query, dataset->D, workload, Q_count);
+	Load_Queries(input_query, 3, Q_count, &workload);
 
 
 	//Perform query
+	cudaProfilerStart();
 	BLAEQ_Object.BLAEQ_Query(workload, Q_count);
+	cudaProfilerStop();
 
 	return 0;
 }
 
 
-void Load_Pcd_Data(std::string path, Multidimensional_Arr* &data_set) {
+Multidimensional_Arr Load_Pcd_Data(std::string path) {
 	const int D = 3; //When using pcl, the dimensionality is bound to be 3.
 
 	pcl::PointCloud<pcl::PointXYZ>* cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -77,13 +76,13 @@ void Load_Pcd_Data(std::string path, Multidimensional_Arr* &data_set) {
 		ite++;
 	}
 	delete(cloud);
-	data_set = &original_dataset;
+
+	return original_dataset;
 }
 
-void Load_Queries(std::string path, int D, double* workload, int Q_count) {
+void Load_Queries(std::string path, int D, int Q_count, double** workload) {
 	std::ifstream file(path);
 	std::vector<double> numbers;
-	std::string line;
 	std::string token;
 	double value;
 
@@ -91,11 +90,12 @@ void Load_Queries(std::string path, int D, double* workload, int Q_count) {
 		std::cerr << "Could not open the file - '" << path << "'" << std::endl;
 	}
 
-	double* query_boundaries = static_cast<double*>(std::malloc(Q_count * D * 2 * sizeof(double)));
+	//double* query_boundaries =nullptr;
+	double* query_boundaries = (double*)malloc(Q_count * D * 2 * sizeof(double));
 
 	for (int i = 0; i < Q_count; i++) {
 		std::getline(file, token);
-		std::vector<std::string> tokens = splitLine(line, ' ');
+		std::vector<std::string> tokens = splitLine(token, ' ');
 		std::vector<std::string>::iterator ite = tokens.begin();
 		for (int j = 0; j < D * 2; j++) {
 			query_boundaries[i * D * 2 + j] = std::stod(*ite);
@@ -103,7 +103,7 @@ void Load_Queries(std::string path, int D, double* workload, int Q_count) {
 		}
 	}
 
-	workload = query_boundaries;
+	*workload = query_boundaries;
 
 	file.close();
 }
@@ -123,3 +123,6 @@ std::vector<std::string> splitLine(const std::string& line, char delimiter) {
 	return tokens;
 }
 
+void f(std::string path){
+	
+}

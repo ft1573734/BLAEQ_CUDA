@@ -1,6 +1,4 @@
 #include "BLAEQ.h";
-#include <thrust/set_operations.h>
-#include <thrust/execution_policy.h>
 #include <iostream>
 
 
@@ -11,13 +9,13 @@ BLAEQ::BLAEQ(int input_N, int input_D, double* multi_dimensional_mesh, int input
 	cusparseCreate(&cusparseHandle);
 	L = _compute_layer(N, input_K);
 
-	BLAEQ_Dimensions = (BLAEQ_Dimension**)malloc(D * sizeof(BLAEQ_Dimension*));
+	BLAEQ_Dimensions = (BLAEQ_Dimension*)malloc(D * sizeof(BLAEQ_Dimension));
 	all_bandwidths = (double*)malloc(D * (L - 1) * sizeof(double));
 
 	for (int i = 0; i < D; i++) {
 		double* temp_mesh = &multi_dimensional_mesh[i * input_N];
 		BLAEQ_Dimension BLAEQ_Dim = BLAEQ_Dimension(i, L, input_K, input_N, temp_mesh, &cusparseHandle);
-		BLAEQ_Dimensions[i] = &BLAEQ_Dim;
+		BLAEQ_Dimensions[i] = BLAEQ_Dim;
 		for (int j = 0; j < (L - 1); j++) {
 			all_bandwidths[i * (L - 1) + j] = BLAEQ_Dim.Bandwidths[j];
 		}
@@ -29,73 +27,115 @@ void BLAEQ::BLAEQ_Query(double* ranges, int Q_count) {
 		//Executing each query
 		int64_t result_count = -1;
 		int* result = nullptr;
-		BLAEQ_Single_Query(ranges, &result_count, &result);
+
+		std::cout << "Processing Query " << i << " ..." << std::endl;
+		auto hostStart = std::chrono::high_resolution_clock::now();
+		BLAEQ_Single_Query(&ranges[Q_size * i], &result_count, &result);
+		auto hostEnd = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> hostDuration = hostEnd - hostStart;
 		std::cout <<"The size of query result is£º"<< result_count <<"." << std::endl;
+		std::cout << "Time consumption of query " << i << " is " << hostDuration.count() << " ms." << std::endl;
 	}
 }
 
 void BLAEQ::BLAEQ_Single_Query(double* ranges, int64_t* result_count_ptr, int** result) {
 
-	int** result_idx_of_each_dimension = (int**)malloc(D * sizeof(int*));
-	double** result_data_of_each_dimension = (double**)malloc(D * sizeof(double*));
+	thrust::device_ptr<int> final_idx_thrust;
+	//double** final_result = (double**)malloc(D * sizeof(double*));
+	int final_size = -1;
 
 	for (int i = 0; i < D; i++) {
 		//2 for length {min, max}
 		double min = ranges[i * 2];
 		double max = ranges[i * 2 + 1];
 
-		int* result_idx_host;
-		double* result_data_host;
-		BLAEQ_Dimension tmp_dimension = *BLAEQ_Dimensions[i];
-		tmp_dimension.BLAEQ_Query_Dimension(min, max, &result_idx_host, &result_data_host);
-		if (result_idx_of_each_dimension == NULL) {
-			std::cerr << "Allocating memory for 'result_idx_of_each_dimension' failed." << std::endl;
-			goto Cleanup;
-		}
-		result_idx_of_each_dimension[i] = result_idx_host;
-		if (result_data_of_each_dimension == NULL) {
-			std::cerr << "Allocating memory for 'result_data_of_each_dimension' failed." << std::endl;
-			goto Cleanup;
-		}
-		result_data_of_each_dimension[i] = result_data_host;
+		int* r_idx_device;
+		double* r_data_device;
+		int r_size;
+		BLAEQ_Dimension tmp_dimension = BLAEQ_Dimensions[i];
+		tmp_dimension.BLAEQ_Query_Dimension(min, max, &r_size, &r_idx_device, &r_data_device);
+
+		//if (DEBUG) {
+		//	int prev_idx = -1;
+		//	for (int i = 0; i < r_size; i++) {
+		//		if(r_idx_host[i] < prev_idx) {
+		//			std::cerr << "WTF" << std::endl;
+		//		}
+		//		else {
+		//			prev_idx = r_idx_host[i];
+		//		}
+		//	}
+		//}
 		
-		//int64_t size;
-		//int64_t nnz;
-		//void* indices;
-		//void* values;
-		//cusparseIndexType_t idxType;
-		//cusparseIndexBase_t idxBase;
-		//cudaDataType valueType;
+		if (final_size == -1) {
+			thrust::device_ptr<int> r_idx_sorted_thrust(r_idx_device);
+			//thrust::device_ptr<double> r_data_thurst_sorted(r_data_device);
+			thrust::sort(r_idx_sorted_thrust, r_idx_sorted_thrust + r_size);
 
-		//cusparseSpVecGet(dim_result, &size, &nnz, &indices, &values, &idxType, &idxBase, &valueType);
-		//if (all_results != nullptr) {
-		//	all_results[i] = dim_result;
-		//}
+			if (DEBUG) {
+				int* sorted_idx_host = (int*)malloc(r_size * sizeof(int));
+				cudaMemcpy(sorted_idx_host, r_idx_sorted_thrust.get(), r_size * sizeof(int), cudaMemcpyDeviceToHost);
+				int prev_idx = -1;
+				for (int i = 0; i < r_size; i++) {
+					if(sorted_idx_host[i] < prev_idx) {
+						std::cerr << "WTF" << std::endl;
+					}
+					else {
+						prev_idx = sorted_idx_host[i];
+					}
+				}
+				free(sorted_idx_host);
+			}
+
+			final_idx_thrust = r_idx_sorted_thrust;
+			//final_result[i] = r_data_thurst_sorted.get();
+			final_size = r_size;
+		}
+		else 
+		{
+			thrust::device_ptr<int> r_idx_sorted_thrust(r_idx_device);
+			//thrust::device_ptr<double> r_data_thurst_sorted(r_data_device);
+			thrust::sort(r_idx_sorted_thrust, r_idx_sorted_thrust + r_size);
+
+			int _max_intersection_size = -1;
+
+			if (final_size <= r_size) {
+				_max_intersection_size = final_size;
+			}
+			else {
+				_max_intersection_size = r_size;
+			}
+
+			int* r_buffer_host;
+			cudaMalloc(&r_buffer_host, _max_intersection_size * sizeof(int));
+			thrust::device_ptr<int> r_buffer_device_thrust(r_buffer_host);
+			//thrust::device_ptr<int> r_buffer_device_thrust(r_buffer_device);
+			//thrust::device_ptr<int> final_idx_thrust(final_idx);
+			//thrust::device_ptr<int> r_idx_thrust(r_idx_device);
+			thrust::device_ptr<int> _intersection_end = thrust::set_intersection(final_idx_thrust, final_idx_thrust + final_size, r_idx_sorted_thrust, r_idx_sorted_thrust + r_size, r_buffer_device_thrust);
+
+			final_size = _intersection_end - r_buffer_device_thrust;
+			if (final_size == 0) {
+				goto Exit;
+			}
+			else {
+				cudaFree(final_idx_thrust.get());
+				//final_idx = (int*)malloc(final_size * sizeof(int));
+				//memcpy(final_idx, r_buffer_host, final_size * sizeof(int));
+				final_idx_thrust = r_buffer_device_thrust;
+			}
 
 
+			cudaFree(r_idx_sorted_thrust.get());
+			cudaFree(r_idx_device);
+			cudaFree(r_data_device);
 
-		//int* result_arr;
-
-		//if (result == NULL) {
-		//	result_arr = (int*)indices;
-		//	*result = result_arr;
-		//	*result_count_ptr = nnz;
-		//}
-		//else {
-		//	int* result_start;
-		//	int* result_end = thrust::set_intersection((int*)indices, (int*)indices + nnz, result, result + *result_count_ptr, result_start);
-		//	*result = result_start;
-		//	int64_t result_count = static_cast<int64_t>((result_end - result_start)/sizeof(int));
-		//	result_count_ptr = &result_count;
-		//}
-	Cleanup:
-		free(result_idx_of_each_dimension);
-		free(result_data_of_each_dimension);
+		}
 	}
-
-
-
-
+Exit:
+	*result_count_ptr = final_size;
+	//std::cout << "The size of the query result is: " << final_size << "." << std::endl;
+	return;
 }
 
 double BLAEQ::_compute_layer(int N, int k) {
